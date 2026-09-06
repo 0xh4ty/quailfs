@@ -1,0 +1,22 @@
+# Build output
+bin/
+build/bin/
+
+# Go
+*.test
+*.out
+coverage.*
+
+# Wails
+frontend/node_modules/
+frontend/dist/
+
+# Local QuailFS data
+node-data/
+*.db
+*.key
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
