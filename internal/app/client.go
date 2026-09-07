@@ -10,9 +10,15 @@ func RunClient() {
 	mnemonic_seed := keys.DeriveSeed(test_mnemonic)
 	fmt.Println("Mnemonic seed derived.")
 
-	keys.DeriveEd25519Seed(mnemonic_seed)
+	ed25519Seed, _ := keys.DeriveEd25519Seed(mnemonic_seed)
 	fmt.Println("Ed25519 seed derived.")
 
-	keys.DeriveX25519Seed(mnemonic_seed)
+	x25519Seed, _ := keys.DeriveX25519Seed(mnemonic_seed)
 	fmt.Println("X25519 seed derived.")
+
+	keys.DeriveEd25519Keypair(ed25519Seed)
+	fmt.Println("Ed25519 keypair derived.")
+
+	keys.DeriveX25519Keypair(x25519Seed)
+	fmt.Println("X25519 keypair derived.")
 }
