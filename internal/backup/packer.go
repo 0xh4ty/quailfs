@@ -1,10 +1,10 @@
 package backup
 
 type PackedPlain struct {
-	Version string
+	Version    string
 	PayloadLen uint64
-	QChunks []QChunk
-	Padding []byte
+	QChunks    []QChunk
+	Padding    []byte
 }
 
 func calculatePackedPlainSize(packedPlain PackedPlain) uint64 {
@@ -25,13 +25,13 @@ func calculateQChunkSize(qchunk QChunk) uint64 {
 	return qchunkSize
 }
 
-func PackChunks (qchunks []QChunk) []PackedPlain {
+func PackChunks(qchunks []QChunk) []PackedPlain {
 	var capacity uint64
 	capacity = 2 * 1024 * 1024
 	var packedPlainCollection []PackedPlain
 	count := 0
 	for {
-		if count == len(qchunks){
+		if count == len(qchunks) {
 			break
 		}
 
@@ -39,7 +39,7 @@ func PackChunks (qchunks []QChunk) []PackedPlain {
 		packedPlain.Version = "v1"
 
 		for count < len(qchunks) {
-			if calculatePackedPlainSize(packedPlain) + calculateQChunkSize(qchunks[count]) > capacity {
+			if calculatePackedPlainSize(packedPlain)+calculateQChunkSize(qchunks[count]) > capacity {
 				break
 			}
 
