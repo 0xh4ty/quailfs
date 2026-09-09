@@ -8,8 +8,8 @@ import (
 )
 
 type QChunk struct {
-	Offset  int
-	Length  int
+	Offset  uint64
+	Length  uint64
 	Data    []byte
 	ChunkID []byte
 }
@@ -41,7 +41,7 @@ func Chunker(file *os.File) ([]QChunk, error) {
 		chunkID := hash[:]
 
 		var qchunk QChunk
-		qchunk.Offset, qchunk.Length, qchunk.Data, qchunk.ChunkID = chunk.Offset, chunk.Length, chunk.Data, chunkID
+		qchunk.Offset, qchunk.Length, qchunk.Data, qchunk.ChunkID = uint64(chunk.Offset), uint64(chunk.Length), chunk.Data, chunkID
 
 		qchunks = append(qchunks, qchunk)
 	}
