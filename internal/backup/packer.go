@@ -57,3 +57,14 @@ func PackChunks(qchunks []QChunk) []PackedPlain {
 
 	return packedPlainCollection
 }
+
+func UnpackChunks(packedPlainCollection []PackedPlain) []QChunk {
+	var compressedQChunks []QChunk
+	for i := range packedPlainCollection {
+		packedPlain := packedPlainCollection[i]
+		for j := range packedPlain.QChunks {
+			compressedQChunks = append(compressedQChunks, packedPlain.QChunks[j])
+		}
+	}
+	return compressedQChunks
+}
