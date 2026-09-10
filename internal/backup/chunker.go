@@ -1,10 +1,11 @@
 package backup
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"github.com/jotfs/fastcdc-go"
 	"io"
-	"os"
+	"sort"
 )
 
 type QChunk struct {
@@ -15,14 +16,16 @@ type QChunk struct {
 	ChunkID []byte
 }
 
-func Chunker(file *os.File) ([]QChunk, error) {
+func Chunker(data []byte) ([]QChunk, error) {
+	dataBuf := bytes.NewReader(data)
+
 	opts := fastcdc.Options{
 		MinSize:     64 * 1024,
 		AverageSize: 256 * 1024,
 		MaxSize:     1 * 1024 * 1024,
 	}
 
-	chunker, err := fastcdc.NewChunker(file, opts)
+	chunker, err := fastcdc.NewChunker(dataBuf, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -48,4 +51,21 @@ func Chunker(file *os.File) ([]QChunk, error) {
 	}
 
 	return qchunks, nil
+}
+
+func Dechunker(qchunks []QChunk) ([]byte, error) {
+	var dataBuf bytes.Buffer
+	sort.Slice(qchunks, func(i, j int) bool {
+		return qchunks[i].Offset < qchunks[j].Offset
+	})
+	count := 0
+
+	for count < len(qchunks) {
+		dataBuf.Write(qchunks[count].Data)
+		count++
+	}
+
+	data := dataBuf.Bytes()
+
+	return data, nil
 }
