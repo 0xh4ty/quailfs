@@ -15,6 +15,7 @@ func Compressor(qchunks []backup.QChunk) ([]backup.QChunk, error) {
 	for i := 0; i < len(qchunks); i++ {
 		qchunk := &qchunks[i]
 		qchunk.Data = encoder.EncodeAll(qchunk.Data, nil)
+		qchunk.CLength = uint64(len(qchunk.Data))
 	}
 
 	return qchunks, nil

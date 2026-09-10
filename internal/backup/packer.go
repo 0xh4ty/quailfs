@@ -21,7 +21,8 @@ func calculateQChunkSize(qchunk QChunk) uint64 {
 	var qchunkSize uint64
 	offsetsize := 8
 	lengthsize := 8
-	qchunkSize = uint64(offsetsize + lengthsize + len(qchunk.Data) + len(qchunk.ChunkID))
+	clengthsize := 8
+	qchunkSize = uint64(offsetsize + lengthsize + clengthsize + len(qchunk.Data) + len(qchunk.ChunkID))
 	return qchunkSize
 }
 

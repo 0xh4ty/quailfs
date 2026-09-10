@@ -43,5 +43,7 @@ func DecodeStripe(shards [][]byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return buf.Bytes(), nil
+	encryptedStripe := buf.Bytes()
+
+	return encryptedStripe, nil
 }
