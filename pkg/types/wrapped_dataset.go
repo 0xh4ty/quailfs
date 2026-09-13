@@ -1,11 +1,11 @@
 package types
 
 type WrappedDataset struct {
-	Body Body
+	Body WrappedDatasetBody
 	Sig  Sig
 }
 
-type Body struct {
+type WrappedDatasetBody struct {
 	UserID           []byte
 	DatasetID        []byte
 	Label            string

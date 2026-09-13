@@ -131,3 +131,56 @@ func SerializeWrappedDatasetBody(wrappedDataset types.WrappedDataset) []byte {
 
 	return serializedWrappedDatasetBody
 }
+
+func SerializeDatasetEntries(datasets []types.DatasetEntry) []byte {
+	var serializedDatasetEntries []byte
+	var buf bytes.Buffer
+
+	datasetEntryCount := uint64(len(datasets))
+	datasetEntryCountBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(datasetEntryCountBytes, datasetEntryCount)
+	buf.Write(datasetEntryCountBytes)
+
+	for i := range datasets {
+		buf.Write(datasets[i].DatasetID)
+
+		labelLen := uint64(len([]byte(datasets[i].Label)))
+		labelLenBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(labelLenBytes, labelLen)
+		buf.Write(labelLenBytes)
+
+		buf.Write([]byte(datasets[i].Label))
+
+		generationBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(generationBytes, datasets[i].Generation)
+		buf.Write(generationBytes)
+	}
+
+	serializedDatasetEntries = buf.Bytes()
+
+	return serializedDatasetEntries
+}
+
+func SerializeUserIndexBody(userIndex types.UserIndex) []byte {
+	var serializedUserIndexBody []byte
+
+	var buf bytes.Buffer
+	schemaBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(schemaBytes, userIndex.Body.Schema)
+	buf.Write(schemaBytes)
+
+	buf.Write(userIndex.Body.UserID)
+
+	generationBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(generationBytes, userIndex.Body.Generation)
+	buf.Write(generationBytes)
+
+	serializedDatasetEntries := SerializeDatasetEntries(userIndex.Body.Datasets)
+	buf.Write(serializedDatasetEntries)
+
+	buf.Write([]byte(userIndex.Body.UpdatedAt))
+
+	serializedUserIndexBody = buf.Bytes()
+
+	return serializedUserIndexBody
+}
