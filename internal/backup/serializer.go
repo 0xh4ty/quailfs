@@ -6,7 +6,7 @@ import (
 	"github.com/0xh4ty/quailfs/pkg/types"
 )
 
-func serializeQChunks(qchunks []QChunk) []byte {
+func serializeQChunks(qchunks []types.QChunk) []byte {
 	count := 0
 	var serializedQChunks []byte
 
@@ -36,7 +36,7 @@ func serializeQChunks(qchunks []QChunk) []byte {
 	return serializedQChunks
 }
 
-func SerializePackedPlainCollection(packedPlainCollection []PackedPlain) [][]byte {
+func SerializePackedPlainCollection(packedPlainCollection []types.PackedPlain) [][]byte {
 	count := 0
 	var serializedPackedPlainCollection [][]byte
 
@@ -61,11 +61,11 @@ func SerializePackedPlainCollection(packedPlainCollection []PackedPlain) [][]byt
 	return serializedPackedPlainCollection
 }
 
-func deserializeQChunks(serializedQChunks []byte) []QChunk {
-	var qchunks []QChunk
+func deserializeQChunks(serializedQChunks []byte) []types.QChunk {
+	var qchunks []types.QChunk
 	position := 0
 	for position < len(serializedQChunks) {
-		var qchunk QChunk
+		var qchunk types.QChunk
 		qchunk.Offset = binary.BigEndian.Uint64(serializedQChunks[position : position+8])
 		position += 8
 		qchunk.Length = binary.BigEndian.Uint64(serializedQChunks[position : position+8])
@@ -81,15 +81,15 @@ func deserializeQChunks(serializedQChunks []byte) []QChunk {
 	return qchunks
 }
 
-func DeserializePackedPlainCollection(serializedPackedPlainCollection [][]byte) []PackedPlain {
-	var packedPlainCollection []PackedPlain
+func DeserializePackedPlainCollection(serializedPackedPlainCollection [][]byte) []types.PackedPlain {
+	var packedPlainCollection []types.PackedPlain
 	capacity := 2 * 1024 * 1024
 
 	for i := range len(serializedPackedPlainCollection) {
 		position := 0
 		serializedPackedPlain := serializedPackedPlainCollection[i]
 		for position < len(serializedPackedPlain) {
-			var packedPlain PackedPlain
+			var packedPlain types.PackedPlain
 			packedPlain.Version = string(serializedPackedPlain[position : position+2])
 			position += 2
 			packedPlain.PayloadLen = binary.BigEndian.Uint64(serializedPackedPlain[position : position+8])

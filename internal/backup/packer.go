@@ -1,13 +1,10 @@
 package backup
 
-type PackedPlain struct {
-	Version    string
-	PayloadLen uint64
-	QChunks    []QChunk
-	Padding    []byte
-}
+import (
+	"github.com/0xh4ty/quailfs/pkg/types"
+)
 
-func calculatePackedPlainSize(packedPlain PackedPlain) uint64 {
+func calculatePackedPlainSize(packedPlain types.PackedPlain) uint64 {
 	payloadlensize := 8
 	var allQchunksSize uint64
 	for _, qchunk := range packedPlain.QChunks {
@@ -17,7 +14,7 @@ func calculatePackedPlainSize(packedPlain PackedPlain) uint64 {
 	return packedPlainSize
 }
 
-func calculateQChunkSize(qchunk QChunk) uint64 {
+func calculateQChunkSize(qchunk types.QChunk) uint64 {
 	var qchunkSize uint64
 	offsetsize := 8
 	lengthsize := 8
@@ -26,17 +23,17 @@ func calculateQChunkSize(qchunk QChunk) uint64 {
 	return qchunkSize
 }
 
-func PackChunks(qchunks []QChunk) []PackedPlain {
+func PackChunks(qchunks []types.QChunk) []types.PackedPlain {
 	var capacity uint64
 	capacity = 2 * 1024 * 1024
-	var packedPlainCollection []PackedPlain
+	var packedPlainCollection []types.PackedPlain
 	count := 0
 	for {
 		if count == len(qchunks) {
 			break
 		}
 
-		var packedPlain PackedPlain
+		var packedPlain types.PackedPlain
 		packedPlain.Version = "v1"
 
 		for count < len(qchunks) {
@@ -58,8 +55,8 @@ func PackChunks(qchunks []QChunk) []PackedPlain {
 	return packedPlainCollection
 }
 
-func UnpackChunks(packedPlainCollection []PackedPlain) []QChunk {
-	var compressedQChunks []QChunk
+func UnpackChunks(packedPlainCollection []types.PackedPlain) []types.QChunk {
+	var compressedQChunks []types.QChunk
 	for i := range packedPlainCollection {
 		packedPlain := packedPlainCollection[i]
 		for j := range packedPlain.QChunks {

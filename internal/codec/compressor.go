@@ -1,11 +1,11 @@
 package codec
 
 import (
-	"github.com/0xh4ty/quailfs/internal/backup"
+	"github.com/0xh4ty/quailfs/pkg/types"
 	"github.com/klauspost/compress/zstd"
 )
 
-func Compressor(qchunks []backup.QChunk) ([]backup.QChunk, error) {
+func Compressor(qchunks []types.QChunk) ([]types.QChunk, error) {
 	encoder, err := zstd.NewWriter(nil)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func Compressor(qchunks []backup.QChunk) ([]backup.QChunk, error) {
 	return qchunks, nil
 }
 
-func Decompressor(qchunks []backup.QChunk) ([]backup.QChunk, error) {
+func Decompressor(qchunks []types.QChunk) ([]types.QChunk, error) {
 	decoder, err := zstd.NewReader(nil)
 	if err != nil {
 		return nil, err

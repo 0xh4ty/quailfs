@@ -3,20 +3,13 @@ package backup
 import (
 	"bytes"
 	"crypto/sha256"
+	"github.com/0xh4ty/quailfs/pkg/types"
 	"github.com/jotfs/fastcdc-go"
 	"io"
 	"sort"
 )
 
-type QChunk struct {
-	Offset  uint64
-	Length  uint64
-	CLength uint64
-	Data    []byte
-	ChunkID []byte
-}
-
-func Chunker(data []byte) ([]QChunk, error) {
+func Chunker(data []byte) ([]types.QChunk, error) {
 	dataBuf := bytes.NewReader(data)
 
 	opts := fastcdc.Options{
@@ -30,7 +23,7 @@ func Chunker(data []byte) ([]QChunk, error) {
 		return nil, err
 	}
 
-	var qchunks []QChunk
+	var qchunks []types.QChunk
 
 	for {
 		chunk, err := chunker.Next()
@@ -44,7 +37,7 @@ func Chunker(data []byte) ([]QChunk, error) {
 		hash := sha256.Sum256(chunk.Data)
 		chunkID := hash[:]
 
-		var qchunk QChunk
+		var qchunk types.QChunk
 		qchunk.Offset, qchunk.Length, qchunk.Data, qchunk.ChunkID = uint64(chunk.Offset), uint64(chunk.Length), chunk.Data, chunkID
 
 		qchunks = append(qchunks, qchunk)
@@ -53,7 +46,7 @@ func Chunker(data []byte) ([]QChunk, error) {
 	return qchunks, nil
 }
 
-func Dechunker(qchunks []QChunk) ([]byte, error) {
+func Dechunker(qchunks []types.QChunk) ([]byte, error) {
 	var dataBuf bytes.Buffer
 	sort.Slice(qchunks, func(i, j int) bool {
 		return qchunks[i].Offset < qchunks[j].Offset
