@@ -3,6 +3,7 @@ package backup
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/0xh4ty/quailfs/pkg/types"
 )
 
 func serializeQChunks(qchunks []QChunk) []byte {
@@ -105,4 +106,28 @@ func DeserializePackedPlainCollection(serializedPackedPlainCollection [][]byte) 
 	}
 
 	return packedPlainCollection
+}
+
+func SerializeWrappedDatasetBody(wrappedDataset types.WrappedDataset) []byte {
+	var serializedWrappedDatasetBody []byte
+
+	var buf bytes.Buffer
+	buf.Write(wrappedDataset.Body.UserID)
+	buf.Write(wrappedDataset.Body.DatasetID)
+	labelLen := uint64(len([]byte(wrappedDataset.Body.Label)))
+	labelLenBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(labelLenBytes, labelLen)
+	buf.Write(labelLenBytes)
+	buf.Write([]byte(wrappedDataset.Body.Label))
+	buf.Write(wrappedDataset.Body.UserX25519Pubkey)
+	buf.Write(wrappedDataset.Body.EphX25519Pubkey)
+	EncDatasetKeyLen := uint64(len([]byte(wrappedDataset.Body.EncDatasetKey)))
+	EncDatasetKeyLenBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(EncDatasetKeyLenBytes, EncDatasetKeyLen)
+	buf.Write(EncDatasetKeyLenBytes)
+	buf.Write(wrappedDataset.Body.EncDatasetKey)
+
+	serializedWrappedDatasetBody = buf.Bytes()
+
+	return serializedWrappedDatasetBody
 }
