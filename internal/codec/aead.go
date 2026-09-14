@@ -1,8 +1,10 @@
 package codec
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 )
 
 func EncryptStripe(stripeKey []byte, nonce_96 []byte, stripe []byte) ([]byte, error) {
@@ -40,4 +42,30 @@ func DecryptStripe(stripeKey []byte, nonce_96 []byte, encryptedStripe []byte) ([
 	}
 
 	return stripe, nil
+}
+
+func EncryptManifest(catalogKey []byte, serializedManifestPlain []byte) ([]byte, error) {
+
+	block, err := aes.NewCipher(catalogKey)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+
+	encryptedManifest := gcm.Seal(nil, nonce, serializedManifestPlain, nil)
+
+	var buf bytes.Buffer
+	buf.Write(nonce)
+	buf.Write(encryptedManifest)
+	encryptedManifestWithNonce := buf.Bytes()
+	return encryptedManifestWithNonce, nil
 }

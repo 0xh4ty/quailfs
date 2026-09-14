@@ -229,3 +229,183 @@ func SerializeHeadBody(head types.Head) []byte {
 
 	return serializedHeadBody
 }
+
+func SerializeFiles(files []types.File) []byte {
+	var serializedFiles []byte
+
+	var buf bytes.Buffer
+
+	filesCount := uint64(len(files))
+	filesCountBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(filesCountBytes, filesCount)
+	buf.Write(filesCountBytes)
+
+	for i := range files {
+		fileNameLen := uint64(len([]byte(files[i].FileName)))
+		fileNameLenBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(fileNameLenBytes, fileNameLen)
+		buf.Write(fileNameLenBytes)
+
+		buf.Write([]byte(files[i].FileName))
+
+		chunkIDCount := uint64(len(files[i].ChunkIDs))
+		chunkIDCountBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(chunkIDCountBytes, chunkIDCount)
+		buf.Write(chunkIDCountBytes)
+
+		for j := range files[i].ChunkIDs {
+			buf.Write(files[i].ChunkIDs[j])
+		}
+	}
+
+	serializedFiles = buf.Bytes()
+
+	return serializedFiles
+}
+
+func SerializeTree(tree types.Tree) []byte {
+	var serializedTree []byte
+
+	var buf bytes.Buffer
+
+	RootDirectoryLen := uint64(len([]byte(tree.RootDirectory)))
+	RootDirectoryLenBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(RootDirectoryLenBytes, RootDirectoryLen)
+	buf.Write(RootDirectoryLenBytes)
+
+	buf.Write([]byte(tree.RootDirectory))
+	serializedFiles := SerializeFiles(tree.Files)
+	buf.Write(serializedFiles)
+
+	childDirectoryCount := uint64(len(tree.ChildDirectories))
+	childDirectoryCountBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(childDirectoryCountBytes, childDirectoryCount)
+	buf.Write(childDirectoryCountBytes)
+
+	for i := range tree.ChildDirectories {
+		serializedChildDirectory := SerializeTree(*tree.ChildDirectories[i])
+		buf.Write(serializedChildDirectory)
+	}
+
+	serializedTree = buf.Bytes()
+
+	return serializedTree
+}
+
+func SerializeMChunks(mchunks []types.MChunk) []byte {
+	var serializedMChunks []byte
+
+	var buf bytes.Buffer
+
+	mchunksCount := uint64(len(mchunks))
+	mchunksCountBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(mchunksCountBytes, mchunksCount)
+	buf.Write(mchunksCountBytes)
+
+	for i := range mchunks {
+		buf.Write(mchunks[i].ChunkID)
+
+		sizeBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(sizeBytes, mchunks[i].Size)
+		buf.Write(sizeBytes)
+
+		buf.Write(mchunks[i].StripeID)
+	}
+
+	serializedMChunks = buf.Bytes()
+
+	return serializedMChunks
+}
+
+func SerializeMStripes(mstripes []types.MStripe) []byte {
+	var serializedMStripes []byte
+
+	var buf bytes.Buffer
+
+	mstripesCount := uint64(len(mstripes))
+	mstripesCountBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(mstripesCountBytes, mstripesCount)
+	buf.Write(mstripesCountBytes)
+
+	for i := range mstripes {
+		buf.Write(mstripes[i].StripeID)
+
+		kBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(kBytes, mstripes[i].K)
+		buf.Write(kBytes)
+
+		nBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(nBytes, mstripes[i].N)
+		buf.Write(nBytes)
+
+		PayloadLenBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(PayloadLenBytes, mstripes[i].PayloadLen)
+		buf.Write(PayloadLenBytes)
+
+		shardNamesCount := uint64(len(mstripes[i].ShardNames))
+		shardNamesCountBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(shardNamesCountBytes, shardNamesCount)
+		buf.Write(shardNamesCountBytes)
+
+		for j := range mstripes[i].ShardNames {
+			buf.Write(mstripes[i].ShardNames[j])
+		}
+	}
+
+	serializedMStripes = buf.Bytes()
+
+	return serializedMStripes
+}
+
+func SerializeTombstones(tombstones []string) []byte {
+	var serializedTombstones []byte
+
+	var buf bytes.Buffer
+
+	tombstonesCount := uint64(len(tombstones))
+	tombstonesCountBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(tombstonesCountBytes, tombstonesCount)
+	buf.Write(tombstonesCountBytes)
+
+	for i := range tombstones {
+		tombstoneLen := uint64(len([]byte(tombstones[i])))
+		tombstoneLenBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(tombstoneLenBytes, tombstoneLen)
+		buf.Write(tombstoneLenBytes)
+
+		buf.Write([]byte(tombstones[i]))
+	}
+
+	serializedTombstones = buf.Bytes()
+
+	return serializedTombstones
+}
+
+func SerializeManifestPlain(manifest types.ManifestEnvelope) []byte {
+	var serializedManifestPlain []byte
+
+	var buf bytes.Buffer
+	buf.Write(manifest.ManifestPlain.DatasetID)
+
+	generationBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(generationBytes, manifest.ManifestPlain.Generation)
+	buf.Write(generationBytes)
+
+	buf.Write(manifest.ManifestPlain.ParentManifestID)
+
+	serializedTree := SerializeTree(manifest.ManifestPlain.Tree)
+	buf.Write(serializedTree)
+
+	serializedMChunks := SerializeMChunks(manifest.ManifestPlain.MChunks)
+	buf.Write(serializedMChunks)
+
+	serializedMStripes := SerializeMStripes(manifest.ManifestPlain.MStripes)
+	buf.Write(serializedMStripes)
+
+	serializedTombstones := SerializeTombstones(manifest.ManifestPlain.Tombstones)
+	buf.Write(serializedTombstones)
+
+	serializedManifestPlain = buf.Bytes()
+
+	return serializedManifestPlain
+}
