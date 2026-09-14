@@ -184,3 +184,48 @@ func SerializeUserIndexBody(userIndex types.UserIndex) []byte {
 
 	return serializedUserIndexBody
 }
+
+func SerializeCatalogPeerHints(catalogPeerHints [][]byte) []byte {
+	var serializedCatalogPeerHints []byte
+
+	var buf bytes.Buffer
+
+	for i := range catalogPeerHints {
+		buf.Write(catalogPeerHints[i])
+	}
+
+	serializedCatalogPeerHints = buf.Bytes()
+
+	return serializedCatalogPeerHints
+}
+
+func SerializeHeadBody(head types.Head) []byte {
+	var serializedHeadBody []byte
+
+	var buf bytes.Buffer
+	schemaBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(schemaBytes, head.Body.Schema)
+	buf.Write(schemaBytes)
+
+	buf.Write(head.Body.UserID)
+	buf.Write(head.Body.DatasetID)
+
+	generationBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(generationBytes, head.Body.Generation)
+	buf.Write(generationBytes)
+
+	buf.Write(head.Body.ManifestID)
+
+	catalogPeerHintsCount := uint64(len(head.Body.CatalogPeerHints))
+	catalogPeerHintsCountBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(catalogPeerHintsCountBytes, catalogPeerHintsCount)
+	buf.Write(catalogPeerHintsCountBytes)
+
+	serializedCatalogPeerHints := SerializeCatalogPeerHints(head.Body.CatalogPeerHints)
+	buf.Write(serializedCatalogPeerHints)
+
+	buf.Write([]byte(head.Body.CreatedAt))
+	serializedHeadBody = buf.Bytes()
+
+	return serializedHeadBody
+}
