@@ -114,17 +114,24 @@ func SerializeWrappedDatasetBody(wrappedDataset types.WrappedDataset) []byte {
 	var buf bytes.Buffer
 	buf.Write(wrappedDataset.Body.UserID)
 	buf.Write(wrappedDataset.Body.DatasetID)
+
 	labelLen := uint64(len([]byte(wrappedDataset.Body.Label)))
 	labelLenBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(labelLenBytes, labelLen)
 	buf.Write(labelLenBytes)
 	buf.Write([]byte(wrappedDataset.Body.Label))
+
+	generationBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(generationBytes, wrappedDataset.Body.Generation)
+	buf.Write(generationBytes)
+
 	buf.Write(wrappedDataset.Body.UserX25519Pubkey)
 	buf.Write(wrappedDataset.Body.EphX25519Pubkey)
-	EncDatasetKeyLen := uint64(len([]byte(wrappedDataset.Body.EncDatasetKey)))
-	EncDatasetKeyLenBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(EncDatasetKeyLenBytes, EncDatasetKeyLen)
-	buf.Write(EncDatasetKeyLenBytes)
+
+	encDatasetKeyLen := uint64(len([]byte(wrappedDataset.Body.EncDatasetKey)))
+	encDatasetKeyLenBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(encDatasetKeyLenBytes, encDatasetKeyLen)
+	buf.Write(encDatasetKeyLenBytes)
 	buf.Write(wrappedDataset.Body.EncDatasetKey)
 
 	serializedWrappedDatasetBody = buf.Bytes()

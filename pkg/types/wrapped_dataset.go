@@ -9,6 +9,7 @@ type WrappedDatasetBody struct {
 	UserID           []byte
 	DatasetID        []byte
 	Label            string
+	Generation       uint64
 	UserX25519Pubkey []byte
 	EphX25519Pubkey  []byte
 	EncDatasetKey    []byte

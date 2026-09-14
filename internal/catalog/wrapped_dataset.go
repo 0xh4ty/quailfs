@@ -10,11 +10,12 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
-func CreateWrappedDataset(userID []byte, datasetID []byte, datasetKey []byte, label string, userX25519pubkey []byte, ed25519privateKey []byte) (types.WrappedDataset, error) {
+func CreateWrappedDataset(userID []byte, datasetID []byte, datasetKey []byte, label string, generation uint64, userX25519pubkey []byte, ed25519privateKey []byte) (types.WrappedDataset, error) {
 	var wrappedDataset types.WrappedDataset
 	wrappedDataset.Body.UserID = userID
 	wrappedDataset.Body.DatasetID = datasetID
 	wrappedDataset.Body.Label = label
+	wrappedDataset.Body.Generation = generation
 	wrappedDataset.Body.UserX25519Pubkey = userX25519pubkey
 
 	seed := make([]byte, 32)
