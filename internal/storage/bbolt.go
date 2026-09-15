@@ -1,0 +1,84 @@
+package storage
+
+import (
+	"errors"
+
+	"go.etcd.io/bbolt"
+)
+
+func InitializeDatabase() (*bbolt.DB, error) {
+	db, err := bbolt.Open("node-data/quailfs.db", 0600, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Update(func(tx *bbolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte("inventory"))
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.CreateBucketIfNotExists([]byte("catalogs"))
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.CreateBucketIfNotExists([]byte("ads"))
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.CreateBucketIfNotExists([]byte("peers"))
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.CreateBucketIfNotExists([]byte("claims"))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func Put(db *bbolt.DB, bucketName string, key []byte, value []byte) error {
+	err := db.Update(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return errors.New("bucket not found")
+		}
+		return bucket.Put(key, value)
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func Get(db *bbolt.DB, bucketName string, key []byte) ([]byte, error) {
+	var value []byte
+	err := db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return errors.New("bucket not found")
+		}
+
+		value = append([]byte(nil), bucket.Get(key)...)
+
+		if value == nil {
+			return nil
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
+}
