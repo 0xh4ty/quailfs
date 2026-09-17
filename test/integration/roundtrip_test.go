@@ -27,7 +27,7 @@ func TestBackupRoundTrip(t *testing.T) {
 
 	// ------------- Backup --------------
 
-	file := "node-data/test_file.txt"
+	file := "../../node-data/test_file.txt"
 
 	data_first, _ := os.ReadFile(file)
 
@@ -109,7 +109,7 @@ func TestBackupRoundTripWithShardLoss(t *testing.T) {
 
 	// ------------- Backup --------------
 
-	file := "node-data/test_file.txt"
+	file := "../../node-data/test_file.txt"
 
 	data_first, _ := os.ReadFile(file)
 

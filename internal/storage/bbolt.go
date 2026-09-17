@@ -7,7 +7,7 @@ import (
 )
 
 func InitializeDatabase() (*bbolt.DB, error) {
-	db, err := bbolt.Open("node-data/quailfs.db", 0600, nil)
+	db, err := bbolt.Open("../../node-data/bbolt/quailfs.db", 0600, nil)
 	if err != nil {
 		return nil, err
 	}
