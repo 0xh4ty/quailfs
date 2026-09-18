@@ -1,22 +1,35 @@
-# Build output
-bin/
-build/bin/
-
 # Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build/test artifacts
 *.test
 *.out
-coverage.*
+coverage.out
+coverage.html
 
-# Wails
-frontend/node_modules/
-frontend/dist/
-
-# Local QuailFS data
+# QuailFS local runtime data
+client-data/
 node-data/
-*.db
-*.key
 
-# OS/editor
+# Wails generated frontend/build output
+frontend/dist/
+frontend/wailsjs/
+
+# Node.js dependencies
+frontend/node_modules/
+
+# Wails build output
+build/bin/
+
+# OS/editor files
 .DS_Store
-.idea/
-.vscode/
+Thumbs.db
+
+# Environment / local configuration
+.env
+.env.*
+!.env.example
