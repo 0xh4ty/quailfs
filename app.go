@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/0xh4ty/quailfs/internal/keys"
 	"sync"
 )
 
@@ -29,4 +30,8 @@ func (a *App) IsUnlocked() bool {
 	defer a.mu.RUnlock()
 
 	return a.unlocked
+}
+
+func (a *App) GenerateRecoveryPhrase() (string, error) {
+	return keys.GenerateMnemonic(), nil
 }

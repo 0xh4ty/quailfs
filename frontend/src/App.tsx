@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Dataset, FileEntry, Node, View } from "./api/types";
+import { generateRecoveryPhrase } from "./api/client";
 
 type AppStage = "splash" | "unlock" | "app";
 
@@ -128,22 +129,13 @@ function App() {
   const [browseMode, setBrowseMode] = useState<BrowseMode>("local");
   const [browsePath, setBrowsePath] = useState("/home/h4ty");
   const [browseEntries, setBrowseEntries] = useState<BrowseEntry[]>([]);
-  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
 
   const selectedDataset = useMemo(
     () => datasets.find((dataset) => dataset.id === selectedDatasetId),
     [datasets, selectedDatasetId],
   );
 
-  /*
-   * Splash screen
-   *
-   * For now this uses a local placeholder for the first-run state.
-   * Once the Wails API is connected, replace the timeout's
-   * nextStage calculation with an App backend call.
-   */
   useEffect(() => {
     if (stage !== "splash") {
       return;
@@ -167,8 +159,7 @@ function App() {
       return;
     }
 
-    const mode: BrowseMode =
-      view === "local-browse" ? "local" : "network";
+    const mode: BrowseMode = view === "local-browse" ? "local" : "network";
 
     setBrowseMode(mode);
     setSelectedPaths(new Set());
@@ -183,13 +174,6 @@ function App() {
   }, [view]);
 
   const handleUnlock = () => {
-    /*
-     * This will eventually call:
-     *
-     * await unlock(recoveryPhrase)
-     *
-     * For the UI phase, unlock directly.
-     */
     setStage("app");
     setView("dashboard");
   };
@@ -225,16 +209,11 @@ function App() {
         return;
       }
 
-      const segments = browsePath
-        .split("/")
-        .filter(Boolean);
+      const segments = browsePath.split("/").filter(Boolean);
 
       segments.pop();
 
-      const parent =
-        segments.length === 0
-          ? "/"
-          : `/${segments.join("/")}`;
+      const parent = segments.length === 0 ? "/" : `/${segments.join("/")}`;
 
       setBrowsePath(parent);
       return;
@@ -244,16 +223,11 @@ function App() {
       return;
     }
 
-    const segments = browsePath
-      .split("/")
-      .filter(Boolean);
+    const segments = browsePath.split("/").filter(Boolean);
 
     segments.pop();
 
-    const parent =
-      segments.length === 0
-        ? "/"
-        : `/${segments.join("/")}`;
+    const parent = segments.length === 0 ? "/" : `/${segments.join("/")}`;
 
     setBrowsePath(parent);
   };
@@ -265,11 +239,6 @@ function App() {
 
     setBrowsePath(entry.path);
 
-    /*
-     * These are temporary mock contents.
-     * Replace this with listLocalFiles() / listNetworkFiles()
-     * when the Wails API is connected.
-     */
     if (browseMode === "local") {
       setBrowseEntries([
         {
@@ -405,14 +374,23 @@ function SplashView() {
   );
 }
 
-function UnlockView({
-  onUnlock,
-}: {
-  onUnlock: () => void;
-}) {
+function UnlockView({ onUnlock }: { onUnlock: () => void }) {
   const [phrase, setPhrase] = useState("");
+  const [mode, setMode] = useState<"unlock" | "generate">("unlock");
+  const [generatedPhrase, setGeneratedPhrase] = useState("");
 
   const canUnlock = phrase.trim().length > 0;
+
+  const handleGenerate = async () => {
+    try {
+      const mnemonic = await generateRecoveryPhrase();
+
+      setGeneratedPhrase(mnemonic);
+      setMode("generate");
+    } catch (error) {
+      console.error("Failed to generate recovery phrase:", error);
+    }
+  };
 
   return (
     <main className="unlock-view">
@@ -421,45 +399,83 @@ function UnlockView({
           <QuailLogo />
         </div>
 
-        <div className="unlock-heading">
-          <h1>Welcome to QuailFS</h1>
-          <p>
-            Enter your recovery phrase to unlock your identity.
-          </p>
+        <div className="unlock-panels">
+          <div
+            className={`unlock-panel-track ${
+              mode === "generate" ? "unlock-panel-track--generate" : ""
+            }`}
+          >
+            <section className="unlock-panel">
+              <div className="unlock-heading">
+                <h1>Welcome to QuailFS</h1>
+                <p>Enter your recovery phrase to unlock your identity.</p>
+              </div>
+
+              <label className="unlock-field" htmlFor="recovery-phrase">
+                <span>Recovery phrase</span>
+
+                <textarea
+                  id="recovery-phrase"
+                  value={phrase}
+                  onChange={(event) => setPhrase(event.target.value)}
+                  placeholder="Enter your recovery phrase"
+                  spellCheck={false}
+                  autoComplete="off"
+                  rows={4}
+                />
+              </label>
+
+              <button
+                className="primary-button unlock-button"
+                type="button"
+                disabled={!canUnlock}
+                onClick={onUnlock}
+              >
+                Unlock
+              </button>
+
+              <button
+                className="text-button"
+                type="button"
+                onClick={handleGenerate}
+              >
+                Generate new recovery phrase
+              </button>
+            </section>
+
+            <section className="unlock-panel">
+              <div className="unlock-heading">
+                <h1>Create your identity</h1>
+                <p>Generate a new recovery phrase for your QuailFS identity.</p>
+              </div>
+
+              <div className="recovery-phrase-display">
+                {generatedPhrase || "Your recovery phrase will appear here."}
+              </div>
+
+              <p className="recovery-warning">
+                Write this phrase down and keep it somewhere safe. QuailFS
+                cannot recover it for you.
+              </p>
+
+              <button
+                className="primary-button unlock-button"
+                type="button"
+                onClick={onUnlock}
+              >
+                I&apos;ve saved my phrase
+              </button>
+
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setMode("unlock")}
+              >
+                ← Back
+              </button>
+            </section>
+          </div>
         </div>
-
-        <label
-          className="unlock-field"
-          htmlFor="recovery-phrase"
-        >
-          <span>Recovery phrase</span>
-
-          <textarea
-            id="recovery-phrase"
-            value={phrase}
-            onChange={(event) => setPhrase(event.target.value)}
-            placeholder="Enter your recovery phrase"
-            spellCheck={false}
-            autoComplete="off"
-            rows={4}
-          />
-        </label>
-
-        <button
-          className="primary-button unlock-button"
-          type="button"
-          disabled={!canUnlock}
-          onClick={onUnlock}
-        >
-          Unlock
-        </button>
-
-        <button
-          className="text-button"
-          type="button"
-        >
-          Restore from recovery phrase
-        </button>
       </div>
     </main>
   );
@@ -527,9 +543,7 @@ function AppShell({
         )}
 
         {view === "dataset" && selectedDataset && (
-          <DatasetView
-            dataset={selectedDataset}
-          />
+          <DatasetView dataset={selectedDataset} />
         )}
 
         {view === "local-browse" && (
@@ -558,9 +572,7 @@ function AppShell({
           />
         )}
 
-        {view === "nodes" && (
-          <NodesView nodes={nodes} />
-        )}
+        {view === "nodes" && <NodesView nodes={nodes} />}
 
         {view === "settings" && <SettingsView />}
       </main>
@@ -628,13 +640,9 @@ function Sidebar({
               type="button"
               onClick={() => onSelectDataset(dataset.id)}
             >
-              <span className="dataset-item-name">
-                {dataset.name}
-              </span>
+              <span className="dataset-item-name">{dataset.name}</span>
 
-              <span className="dataset-item-meta">
-                {dataset.size}
-              </span>
+              <span className="dataset-item-meta">{dataset.size}</span>
             </button>
           ))}
         </div>
@@ -642,9 +650,7 @@ function Sidebar({
 
       <nav className="sidebar-navigation">
         <button
-          className={`nav-item ${
-            view === "nodes" ? "nav-item--active" : ""
-          }`}
+          className={`nav-item ${view === "nodes" ? "nav-item--active" : ""}`}
           type="button"
           onClick={() => onNavigate("nodes")}
         >
@@ -712,25 +718,13 @@ function DashboardView({
       </section>
 
       <section className="stats-grid">
-        <StatCard
-          label="Files"
-          value={dataset.files.toLocaleString()}
-        />
+        <StatCard label="Files" value={dataset.files.toLocaleString()} />
 
-        <StatCard
-          label="Data"
-          value={dataset.size}
-        />
+        <StatCard label="Data" value={dataset.size} />
 
-        <StatCard
-          label="Last backup"
-          value={dataset.lastBackup}
-        />
+        <StatCard label="Last backup" value={dataset.lastBackup} />
 
-        <StatCard
-          label="Health"
-          value="Healthy"
-        />
+        <StatCard label="Health" value="Healthy" />
       </section>
 
       <section className="dashboard-section">
@@ -765,11 +759,7 @@ function DashboardView({
   );
 }
 
-function DatasetView({
-  dataset,
-}: {
-  dataset: Dataset;
-}) {
+function DatasetView({ dataset }: { dataset: Dataset }) {
   return (
     <div className="page">
       <PageHeader
@@ -787,16 +777,8 @@ function DatasetView({
         <FileTreeRow name="Documents" type="directory" />
         <FileTreeRow name="Projects" type="directory" />
         <FileTreeRow name="Pictures" type="directory" />
-        <FileTreeRow
-          name="README.md"
-          type="file"
-          size="12 KB"
-        />
-        <FileTreeRow
-          name="notes.txt"
-          type="file"
-          size="4.8 KB"
-        />
+        <FileTreeRow name="README.md" type="file" size="12 KB" />
+        <FileTreeRow name="notes.txt" type="file" size="4.8 KB" />
       </div>
     </div>
   );
@@ -826,11 +808,7 @@ function BrowseFilesView({
   return (
     <div className="page browse-files-view">
       <div className="browse-header">
-        <button
-          className="back-button"
-          type="button"
-          onClick={onBack}
-        >
+        <button className="back-button" type="button" onClick={onBack}>
           <span aria-hidden="true">←</span>
           <span>Back</span>
         </button>
@@ -841,9 +819,7 @@ function BrowseFilesView({
           </span>
 
           <h1>
-            {isLocal
-              ? "Select files to back up"
-              : "Select files to restore"}
+            {isLocal ? "Select files to back up" : "Select files to restore"}
           </h1>
 
           <p>
@@ -865,9 +841,7 @@ function BrowseFilesView({
           <span>Parent</span>
         </button>
 
-        <div className="browse-path">
-          {path}
-        </div>
+        <div className="browse-path">{path}</div>
 
         <div className="browse-selection-count">
           {selectedPaths.size} selected
@@ -882,9 +856,7 @@ function BrowseFilesView({
 
         {entries.length === 0 ? (
           <div className="empty-state">
-            <span className="empty-state-title">
-              This directory is empty
-            </span>
+            <span className="empty-state-title">This directory is empty</span>
           </div>
         ) : (
           entries.map((entry) => {
@@ -894,9 +866,7 @@ function BrowseFilesView({
               <div
                 key={entry.path}
                 className={`browse-file-row ${
-                  selected
-                    ? "browse-file-row--selected"
-                    : ""
+                  selected ? "browse-file-row--selected" : ""
                 }`}
               >
                 <div className="browse-file-main">
@@ -920,9 +890,7 @@ function BrowseFilesView({
                       {entry.type === "directory" ? "□" : "▤"}
                     </span>
 
-                    <span className="browse-file-name">
-                      {entry.name}
-                    </span>
+                    <span className="browse-file-name">{entry.name}</span>
                   </button>
                 </div>
 
@@ -935,9 +903,7 @@ function BrowseFilesView({
 
                   <button
                     className={`selection-checkbox ${
-                      selected
-                        ? "selection-checkbox--selected"
-                        : ""
+                      selected ? "selection-checkbox--selected" : ""
                     }`}
                     type="button"
                     aria-label={
@@ -945,9 +911,7 @@ function BrowseFilesView({
                         ? `Deselect ${entry.name}`
                         : `Select ${entry.name}`
                     }
-                    onClick={() =>
-                      onToggleSelection(entry)
-                    }
+                    onClick={() => onToggleSelection(entry)}
                   >
                     {selected ? "✓" : ""}
                   </button>
@@ -979,14 +943,8 @@ function BrowseFilesView({
   );
 }
 
-function NodesView({
-  nodes,
-}: {
-  nodes: Node[];
-}) {
-  const onlineCount = nodes.filter(
-    (node) => node.status === "Online",
-  ).length;
+function NodesView({ nodes }: { nodes: Node[] }) {
+  const onlineCount = nodes.filter((node) => node.status === "Online").length;
 
   return (
     <div className="page">
@@ -999,16 +957,11 @@ function NodesView({
       <section className="nodes-section">
         <div className="section-heading">
           <div>
-            <span className="section-eyebrow">
-              Bootstrap nodes
-            </span>
+            <span className="section-eyebrow">Bootstrap nodes</span>
             <h2>Configured entry points</h2>
           </div>
 
-          <button
-            className="secondary-button"
-            type="button"
-          >
+          <button className="secondary-button" type="button">
             Add node
           </button>
         </div>
@@ -1017,10 +970,7 @@ function NodesView({
           {nodes
             .filter((node) => node.bootstrap)
             .map((node) => (
-              <NodeRow
-                key={node.peerId}
-                node={node}
-              />
+              <NodeRow key={node.peerId} node={node} />
             ))}
         </div>
       </section>
@@ -1028,24 +978,17 @@ function NodesView({
       <section className="nodes-section">
         <div className="section-heading">
           <div>
-            <span className="section-eyebrow">
-              Known nodes
-            </span>
+            <span className="section-eyebrow">Known nodes</span>
             <h2>
               Network peers
-              <span className="section-count">
-                {onlineCount} online
-              </span>
+              <span className="section-count">{onlineCount} online</span>
             </h2>
           </div>
         </div>
 
         <div className="node-list">
           {nodes.map((node) => (
-            <NodeRow
-              key={node.peerId}
-              node={node}
-            />
+            <NodeRow key={node.peerId} node={node} />
           ))}
         </div>
       </section>
@@ -1053,11 +996,7 @@ function NodesView({
   );
 }
 
-function NodeRow({
-  node,
-}: {
-  node: Node;
-}) {
+function NodeRow({ node }: { node: Node }) {
   const statusClass =
     node.status === "Online"
       ? "node-status--online"
@@ -1077,27 +1016,17 @@ function NodeRow({
         />
 
         <div>
-          <span className="node-peer-id">
-            {node.peerId}
-          </span>
+          <span className="node-peer-id">{node.peerId}</span>
 
           <span className="node-source">
-            {node.bootstrap
-              ? "Bootstrap"
-              : "Discovered"}
+            {node.bootstrap ? "Bootstrap" : "Discovered"}
           </span>
         </div>
       </div>
 
-      <div
-        className={`node-status ${statusClass}`}
-      >
-        {node.status}
-      </div>
+      <div className={`node-status ${statusClass}`}>{node.status}</div>
 
-      <div className="node-latency">
-        {node.latency}
-      </div>
+      <div className="node-latency">{node.latency}</div>
     </div>
   );
 }
@@ -1149,24 +1078,14 @@ function SettingsRow({
   description: string;
 }) {
   return (
-    <button
-      className="settings-row"
-      type="button"
-    >
+    <button className="settings-row" type="button">
       <div>
-        <span className="settings-row-title">
-          {title}
-        </span>
+        <span className="settings-row-title">{title}</span>
 
-        <span className="settings-row-description">
-          {description}
-        </span>
+        <span className="settings-row-description">{description}</span>
       </div>
 
-      <span
-        className="settings-row-arrow"
-        aria-hidden="true"
-      >
+      <span className="settings-row-arrow" aria-hidden="true">
         →
       </span>
     </button>
@@ -1205,31 +1124,19 @@ function ActionCard({
   return (
     <article className="action-card">
       <div className="action-card-content">
-        <span className="action-card-label">
-          {title}
-        </span>
+        <span className="action-card-label">{title}</span>
 
         <p>{description}</p>
       </div>
 
-      <button
-        className="primary-button"
-        type="button"
-        onClick={onClick}
-      >
+      <button className="primary-button" type="button" onClick={onClick}>
         {action}
       </button>
     </article>
   );
 }
 
-function StatCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <article className="stat-card">
       <span>{label}</span>
@@ -1273,10 +1180,7 @@ function FileTreeRow({
   return (
     <div className="file-tree-row">
       <span className="file-tree-name">
-        <span
-          className="file-tree-icon"
-          aria-hidden="true"
-        >
+        <span className="file-tree-icon" aria-hidden="true">
           {type === "directory" ? "□" : "▤"}
         </span>
 
@@ -1294,16 +1198,11 @@ function formatBytes(bytes: number): string {
   }
 
   const units = ["B", "KB", "MB", "GB", "TB"];
-  const index = Math.floor(
-    Math.log(bytes) / Math.log(1024),
-  );
+  const index = Math.floor(Math.log(bytes) / Math.log(1024));
 
-  const value =
-    bytes / Math.pow(1024, index);
+  const value = bytes / Math.pow(1024, index);
 
-  return `${value.toFixed(
-    value >= 10 || index === 0 ? 0 : 1,
-  )} ${units[index]}`;
+  return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
 function QuailLogo() {
@@ -1329,12 +1228,7 @@ function QuailLogo() {
         fill="currentColor"
       />
 
-      <circle
-        cx="104"
-        cy="57"
-        r="5"
-        fill="white"
-      />
+      <circle cx="104" cy="57" r="5" fill="white" />
 
       <path
         d="M76 127C65 137 54 142 41 141"
