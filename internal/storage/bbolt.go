@@ -38,6 +38,11 @@ func InitializeDatabase() (*bbolt.DB, error) {
 			return err
 		}
 
+		_, err = tx.CreateBucketIfNotExists([]byte("bootstrap"))
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {

@@ -6,12 +6,10 @@ import type {
   UserInfo,
 } from "./types";
 
-import { GenerateRecoveryPhrase } from "../../wailsjs/go/main/App";
+import { GenerateRecoveryPhrase, Unlock } from "../../wailsjs/go/main/App";
 
 export async function unlock(recoveryPhrase: string): Promise<boolean> {
-  void recoveryPhrase;
-
-  throw new Error("Wails unlock method has not been connected yet.");
+  return Unlock(recoveryPhrase);
 }
 
 export async function getUserInfo(): Promise<UserInfo> {

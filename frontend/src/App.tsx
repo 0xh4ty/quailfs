@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Dataset, FileEntry, Node, View } from "./api/types";
-import { generateRecoveryPhrase } from "./api/client";
+import { generateRecoveryPhrase, unlock } from "./api/client";
 
 type AppStage = "splash" | "unlock" | "app";
 
@@ -173,9 +173,12 @@ function App() {
     }
   }, [view]);
 
-  const handleUnlock = () => {
-    setStage("app");
-    setView("dashboard");
+  const handleUnlock = async (phrase: string) => {
+    const success = await unlock(phrase);
+
+    if (success) {
+      setStage("app");
+    }
   };
 
   const handleSelectDataset = (datasetId: string) => {
@@ -374,7 +377,7 @@ function SplashView() {
   );
 }
 
-function UnlockView({ onUnlock }: { onUnlock: () => void }) {
+function UnlockView({ onUnlock }: { onUnlock: (phrase: string) => void }) {
   const [phrase, setPhrase] = useState("");
   const [mode, setMode] = useState<"unlock" | "generate">("unlock");
   const [generatedPhrase, setGeneratedPhrase] = useState("");
@@ -429,7 +432,7 @@ function UnlockView({ onUnlock }: { onUnlock: () => void }) {
                 className="primary-button unlock-button"
                 type="button"
                 disabled={!canUnlock}
-                onClick={onUnlock}
+                onClick={() => onUnlock(phrase)}
               >
                 Unlock
               </button>
@@ -461,7 +464,7 @@ function UnlockView({ onUnlock }: { onUnlock: () => void }) {
               <button
                 className="primary-button unlock-button"
                 type="button"
-                onClick={onUnlock}
+                onClick={() => onUnlock(generatedPhrase)}
               >
                 I&apos;ve saved my phrase
               </button>
