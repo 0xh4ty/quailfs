@@ -34,11 +34,16 @@ func Chunker(data []byte) ([]types.QChunk, error) {
 			return nil, err
 		}
 
+		chunk_data := append([]byte(nil), chunk.Data...)
+
 		hash := sha256.Sum256(chunk.Data)
 		chunkID := hash[:]
 
 		var qchunk types.QChunk
-		qchunk.Offset, qchunk.Length, qchunk.Data, qchunk.ChunkID = uint64(chunk.Offset), uint64(chunk.Length), chunk.Data, chunkID
+		qchunk.Offset = uint64(chunk.Offset)
+		qchunk.Length = uint64(chunk.Length)
+		qchunk.Data = chunk_data
+		qchunk.ChunkID = chunkID
 
 		qchunks = append(qchunks, qchunk)
 	}

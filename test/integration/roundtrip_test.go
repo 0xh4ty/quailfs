@@ -149,10 +149,16 @@ func TestBackupRoundTripWithShardLoss(t *testing.T) {
 	// ----------- Shard Loss -------------
 
 	for i := range shard_collection {
+		lost := make(map[int]bool)
 
-		for range 4 {
+		for len(lost) < 4 {
 			index := rand.Intn(len(shard_collection[i]))
-			shard_collection[i] = append(shard_collection[i][:index], shard_collection[i][index+1:]...)
+			if lost[index] {
+				continue
+			}
+
+			lost[index] = true
+			shard_collection[i][index] = nil
 		}
 	}
 
