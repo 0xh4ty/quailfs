@@ -10,6 +10,8 @@ import {
   GenerateRecoveryPhrase,
   Unlock,
   CreateDataset,
+  ListDirectory,
+  GetHomeDirectory,
 } from "../../wailsjs/go/main/App";
 
 export async function unlock(recoveryPhrase: string): Promise<boolean> {
@@ -92,4 +94,19 @@ export async function getBackupProgress(): Promise<BackupProgress> {
 
 export async function generateRecoveryPhrase(): Promise<string> {
   return GenerateRecoveryPhrase();
+}
+
+export async function listDirectory(path: string): Promise<FileEntry[]> {
+  const entries = await ListDirectory(path);
+
+  return entries.map((entry) => ({
+    name: entry.name,
+    path: entry.path,
+    type: entry.type as "file" | "directory",
+    size: entry.size,
+  }));
+}
+
+export async function getHomeDirectory(): Promise<string> {
+  return GetHomeDirectory();
 }

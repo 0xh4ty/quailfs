@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/0xh4ty/quailfs/internal/keys"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -44,6 +46,13 @@ type DatasetInfo struct {
 	Size       string
 	Files      int
 	LastBackup string
+}
+
+type FileEntry struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Type string `json:"type"`
+	Size int64  `json:"size,omitempty"`
 }
 
 func NewApp() *App {
@@ -169,4 +178,45 @@ func (a *App) CreateDataset(label string) (DatasetInfo, error) {
 		Files:      0,
 		LastBackup: "Never",
 	}, nil
+}
+
+func (a *App) ListDirectory(path string) ([]FileEntry, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	if !a.unlocked {
+		return nil, errors.New("identity is locked")
+	}
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]FileEntry, 0, len(entries))
+
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+
+		fileType := "file"
+		if entry.IsDir() {
+			fileType = "directory"
+		}
+
+		files = append(files, FileEntry{
+			Name: entry.Name(),
+			Path: filepath.Join(path, entry.Name()),
+			Type: fileType,
+			Size: info.Size(),
+		})
+	}
+
+	return files, nil
+}
+
+func (a *App) GetHomeDirectory() (string, error) {
+	return os.UserHomeDir()
 }

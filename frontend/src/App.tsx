@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Dataset, FileEntry, Node, View } from "./api/types";
-import { generateRecoveryPhrase, unlock, createDataset } from "./api/client";
+import {
+  generateRecoveryPhrase,
+  unlock,
+  createDataset,
+  listDirectory,
+  getHomeDirectory,
+} from "./api/client";
 
 type AppStage = "splash" | "unlock" | "app";
 
@@ -28,41 +34,6 @@ const MOCK_NODES: Node[] = [
     status: "Offline",
     latency: "—",
     bootstrap: false,
-  },
-];
-
-const MOCK_LOCAL_FILES: FileEntry[] = [
-  {
-    name: "Documents",
-    path: "/home/h4ty/Documents",
-    type: "directory",
-  },
-  {
-    name: "Downloads",
-    path: "/home/h4ty/Downloads",
-    type: "directory",
-  },
-  {
-    name: "Projects",
-    path: "/home/h4ty/Projects",
-    type: "directory",
-  },
-  {
-    name: "Pictures",
-    path: "/home/h4ty/Pictures",
-    type: "directory",
-  },
-  {
-    name: ".bashrc",
-    path: "/home/h4ty/.bashrc",
-    type: "file",
-    size: 1821,
-  },
-  {
-    name: "notes.txt",
-    path: "/home/h4ty/notes.txt",
-    type: "file",
-    size: 4820,
   },
 ];
 
@@ -110,8 +81,9 @@ function App() {
 
   const [nodes] = useState<Node[]>(MOCK_NODES);
 
+  const [homeDirectory, setHomeDirectory] = useState("");
   const [browseMode, setBrowseMode] = useState<BrowseMode>("local");
-  const [browsePath, setBrowsePath] = useState("/home/h4ty");
+  const [browsePath, setBrowsePath] = useState("");
   const [browseEntries, setBrowseEntries] = useState<BrowseEntry[]>([]);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
 
@@ -149,18 +121,26 @@ function App() {
     setSelectedPaths(new Set());
 
     if (mode === "local") {
-      setBrowsePath("/home/h4ty");
-      setBrowseEntries(MOCK_LOCAL_FILES);
+      setBrowsePath(homeDirectory);
+
+      listDirectory(homeDirectory)
+        .then(setBrowseEntries)
+        .catch((error) => {
+          console.error("Failed to list directory:", error);
+          setBrowseEntries([]);
+        });
     } else {
       setBrowsePath("/");
       setBrowseEntries(MOCK_NETWORK_FILES);
     }
-  }, [view]);
+  }, [view, homeDirectory]);
 
   const handleUnlock = async (phrase: string) => {
     const success = await unlock(phrase);
 
     if (success) {
+      const home = await getHomeDirectory();
+      setHomeDirectory(home);
       setStage("app");
     }
   };
@@ -172,8 +152,7 @@ function App() {
 
   const handleStartBackup = () => {
     setBrowseMode("local");
-    setBrowsePath("/home/h4ty");
-    setBrowseEntries(MOCK_LOCAL_FILES);
+    setBrowsePath(homeDirectory);
     setSelectedPaths(new Set());
     setView("local-browse");
   };
@@ -190,83 +169,63 @@ function App() {
     setView("dashboard");
   };
 
-  const handleDirectoryBack = () => {
+  const handleDirectoryBack = async () => {
     if (browseMode === "network") {
       if (browsePath === "/") {
         return;
       }
 
       const segments = browsePath.split("/").filter(Boolean);
-
       segments.pop();
 
       const parent = segments.length === 0 ? "/" : `/${segments.join("/")}`;
 
       setBrowsePath(parent);
+
+      try {
+        const entries = await listDirectory(parent);
+        setBrowseEntries(entries);
+      } catch (error) {
+        console.error("Failed to list parent directory:", error);
+        setBrowseEntries([]);
+      }
+
       return;
     }
 
-    if (browsePath === "/") {
+    if (browsePath === "/" || browsePath === homeDirectory) {
       return;
     }
 
     const segments = browsePath.split("/").filter(Boolean);
-
     segments.pop();
 
     const parent = segments.length === 0 ? "/" : `/${segments.join("/")}`;
 
     setBrowsePath(parent);
+
+    try {
+      const entries = await listDirectory(parent);
+      setBrowseEntries(entries);
+    } catch (error) {
+      console.error("Failed to list parent directory:", error);
+      setBrowseEntries([]);
+    }
   };
 
-  const handleOpenDirectory = (entry: BrowseEntry) => {
+  const handleOpenDirectory = async (entry: BrowseEntry) => {
     if (entry.type !== "directory") {
       return;
     }
 
-    setBrowsePath(entry.path);
-
-    if (browseMode === "local") {
-      setBrowseEntries([
-        {
-          name: "Work",
-          path: `${entry.path}/Work`,
-          type: "directory",
-        },
-        {
-          name: "Archive",
-          path: `${entry.path}/Archive`,
-          type: "directory",
-        },
-        {
-          name: "example.txt",
-          path: `${entry.path}/example.txt`,
-          type: "file",
-          size: 9216,
-        },
-      ]);
-    } else {
-      setBrowseEntries([
-        {
-          name: "2026",
-          path: `${entry.path}/2026`,
-          type: "directory",
-        },
-        {
-          name: "Archive",
-          path: `${entry.path}/Archive`,
-          type: "directory",
-        },
-        {
-          name: "example.txt",
-          path: `${entry.path}/example.txt`,
-          type: "file",
-          size: 9216,
-        },
-      ]);
+    try {
+      setBrowsePath(entry.path);
+      const entries = await listDirectory(entry.path);
+      setBrowseEntries(entries);
+    } catch (error) {
+      console.error("Failed to list directory:", error);
+      setBrowseEntries([]);
     }
-
-    setSelectedPaths(new Set());
   };
 
   const handleToggleSelection = (entry: BrowseEntry) => {
@@ -337,6 +296,7 @@ function App() {
         selectedDatasetId={selectedDatasetId}
         selectedDataset={selectedDataset}
         browseMode={browseMode}
+        homeDirectory={homeDirectory}
         browsePath={browsePath}
         browseEntries={browseEntries}
         selectedPaths={selectedPaths}
@@ -545,6 +505,7 @@ type AppShellProps = {
   selectedDatasetId: string;
   selectedDataset: Dataset | undefined;
   browseMode: BrowseMode;
+  homeDirectory: string;
   browsePath: string;
   browseEntries: BrowseEntry[];
   selectedPaths: Set<string>;
@@ -566,6 +527,7 @@ function AppShell({
   selectedDatasetId,
   selectedDataset,
   browseMode,
+  homeDirectory,
   browsePath,
   browseEntries,
   selectedPaths,
@@ -607,6 +569,7 @@ function AppShell({
           <BrowseFilesView
             mode="local"
             path={browsePath}
+            homeDirectory={homeDirectory}
             entries={browseEntries}
             selectedPaths={selectedPaths}
             onBack={onBrowseBack}
@@ -620,6 +583,7 @@ function AppShell({
           <BrowseFilesView
             mode="network"
             path={browsePath}
+            homeDirectory={homeDirectory}
             entries={browseEntries}
             selectedPaths={selectedPaths}
             onBack={onBrowseBack}
@@ -844,6 +808,7 @@ function DatasetView({ dataset }: { dataset: Dataset }) {
 function BrowseFilesView({
   mode,
   path,
+  homeDirectory,
   entries,
   selectedPaths,
   onBack,
@@ -853,6 +818,7 @@ function BrowseFilesView({
 }: {
   mode: BrowseMode;
   path: string;
+  homeDirectory: string;
   entries: BrowseEntry[];
   selectedPaths: Set<string>;
   onBack: () => void;
@@ -892,7 +858,7 @@ function BrowseFilesView({
           className="directory-back-button"
           type="button"
           onClick={onDirectoryBack}
-          disabled={path === "/" || path === "/home/h4ty"}
+          disabled={path === "/" || path === homeDirectory}
         >
           <span aria-hidden="true">↑</span>
           <span>Parent</span>
