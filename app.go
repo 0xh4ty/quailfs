@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/0xh4ty/quailfs/internal/keys"
+	"strings"
 	"sync"
 )
 
@@ -20,6 +21,8 @@ type App struct {
 	ed25519PublicKey  []byte
 	x25519PrivateKey  []byte
 	x25519PublicKey   []byte
+
+	datasets map[string]DatasetSession
 }
 
 type UserInfo struct {
@@ -27,8 +30,26 @@ type UserInfo struct {
 	PublicKey string
 }
 
+type DatasetSession struct {
+	DatasetID  []byte
+	DatasetKey []byte
+	CatalogKey []byte
+	DataKey    []byte
+	NameKey    []byte
+}
+
+type DatasetInfo struct {
+	ID         string
+	Name       string
+	Size       string
+	Files      int
+	LastBackup string
+}
+
 func NewApp() *App {
-	return &App{}
+	return &App{
+		datasets: make(map[string]DatasetSession),
+	}
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -95,5 +116,57 @@ func (a *App) GetUserInfo() (UserInfo, error) {
 	return UserInfo{
 		UserID:    hex.EncodeToString(a.userID),
 		PublicKey: hex.EncodeToString(a.ed25519PublicKey),
+	}, nil
+}
+
+func (a *App) CreateDataset(label string) (DatasetInfo, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if !a.unlocked {
+		return DatasetInfo{}, errors.New("user is not unlocked")
+	}
+
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return DatasetInfo{}, errors.New("dataset label cannot be empty")
+	}
+
+	datasetKey, err := keys.GenerateDatasetKey()
+	if err != nil {
+		return DatasetInfo{}, err
+	}
+
+	datasetID := keys.DeriveDatasetID(a.userID, label)
+
+	catalogKey, err := keys.DeriveCatalogKey(datasetKey, datasetID)
+	if err != nil {
+		return DatasetInfo{}, err
+	}
+
+	dataKey, err := keys.DeriveDataKey(datasetKey, datasetID)
+	if err != nil {
+		return DatasetInfo{}, err
+	}
+
+	nameKey, err := keys.DeriveNameKey(datasetKey, datasetID)
+	if err != nil {
+		return DatasetInfo{}, err
+	}
+
+	a.datasets[hex.EncodeToString(datasetID)] = DatasetSession{
+		DatasetID:  datasetID,
+		DatasetKey: datasetKey,
+		CatalogKey: catalogKey,
+		DataKey:    dataKey,
+		NameKey:    nameKey,
+	}
+
+	return DatasetInfo{
+		ID:         hex.EncodeToString(datasetID),
+		Name:       label,
+		Size:       "0 B",
+		Files:      0,
+		LastBackup: "Never",
 	}, nil
 }

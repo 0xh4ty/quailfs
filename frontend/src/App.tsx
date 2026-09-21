@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Dataset, FileEntry, Node, View } from "./api/types";
-import { generateRecoveryPhrase, unlock } from "./api/client";
+import { generateRecoveryPhrase, unlock, createDataset } from "./api/client";
 
 type AppStage = "splash" | "unlock" | "app";
 
@@ -9,23 +9,6 @@ type BrowseMode = "local" | "network";
 type BrowseEntry = FileEntry & {
   selected?: boolean;
 };
-
-const MOCK_DATASETS: Dataset[] = [
-  {
-    id: "dataset-1",
-    name: "Personal",
-    size: "18.4 GB",
-    files: 12482,
-    lastBackup: "Today, 09:42",
-  },
-  {
-    id: "dataset-2",
-    name: "Projects",
-    size: "7.2 GB",
-    files: 3821,
-    lastBackup: "Yesterday, 23:18",
-  },
-];
 
 const MOCK_NODES: Node[] = [
   {
@@ -119,10 +102,11 @@ function App() {
   const [splashLeaving, setSplashLeaving] = useState(false);
 
   const [view, setView] = useState<View>("dashboard");
-  const [datasets, setDatasets] = useState<Dataset[]>(MOCK_DATASETS);
-  const [selectedDatasetId, setSelectedDatasetId] = useState(
-    MOCK_DATASETS[0]?.id ?? "",
-  );
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [selectedDatasetId, setSelectedDatasetId] = useState("");
+
+  const [creatingDataset, setCreatingDataset] = useState(false);
+  const [datasetLabel, setDatasetLabel] = useState("");
 
   const [nodes] = useState<Node[]>(MOCK_NODES);
 
@@ -300,19 +284,28 @@ function App() {
   };
 
   const handleCreateDataset = () => {
-    const id = `dataset-${Date.now()}`;
+    setDatasetLabel("");
+    setCreatingDataset(true);
+  };
 
-    const dataset: Dataset = {
-      id,
-      name: `Dataset ${datasets.length + 1}`,
-      size: "0 B",
-      files: 0,
-      lastBackup: "Never",
-    };
+  const handleSubmitCreateDataset = async () => {
+    const label = datasetLabel.trim();
 
-    setDatasets((previous) => [...previous, dataset]);
-    setSelectedDatasetId(id);
-    setView("dashboard");
+    if (!label) {
+      return;
+    }
+
+    try {
+      const dataset = await createDataset(label);
+
+      setDatasets((previous) => [...previous, dataset]);
+      setSelectedDatasetId(dataset.id);
+      setView("dashboard");
+      setCreatingDataset(false);
+      setDatasetLabel("");
+    } catch (error) {
+      console.error("Failed to create dataset:", error);
+    }
   };
 
   if (stage === "splash") {
@@ -336,26 +329,87 @@ function App() {
   }
 
   return (
-    <AppShell
-      view={view}
-      datasets={datasets}
-      nodes={nodes}
-      selectedDatasetId={selectedDatasetId}
-      selectedDataset={selectedDataset}
-      browseMode={browseMode}
-      browsePath={browsePath}
-      browseEntries={browseEntries}
-      selectedPaths={selectedPaths}
-      onNavigate={setView}
-      onSelectDataset={handleSelectDataset}
-      onCreateDataset={handleCreateDataset}
-      onStartBackup={handleStartBackup}
-      onStartRestore={handleStartRestore}
-      onBrowseBack={handleBrowseBack}
-      onDirectoryBack={handleDirectoryBack}
-      onOpenDirectory={handleOpenDirectory}
-      onToggleSelection={handleToggleSelection}
-    />
+    <>
+      <AppShell
+        view={view}
+        datasets={datasets}
+        nodes={nodes}
+        selectedDatasetId={selectedDatasetId}
+        selectedDataset={selectedDataset}
+        browseMode={browseMode}
+        browsePath={browsePath}
+        browseEntries={browseEntries}
+        selectedPaths={selectedPaths}
+        onNavigate={setView}
+        onSelectDataset={handleSelectDataset}
+        onCreateDataset={handleCreateDataset}
+        onStartBackup={handleStartBackup}
+        onStartRestore={handleStartRestore}
+        onBrowseBack={handleBrowseBack}
+        onDirectoryBack={handleDirectoryBack}
+        onOpenDirectory={handleOpenDirectory}
+        onToggleSelection={handleToggleSelection}
+      />
+
+      {creatingDataset && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <div className="modal-header">
+              <h2>New dataset</h2>
+
+              <button
+                className="icon-button"
+                type="button"
+                onClick={() => setCreatingDataset(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <label className="field-label" htmlFor="dataset-label">
+                Dataset name
+              </label>
+
+              <input
+                id="dataset-label"
+                className="text-input"
+                type="text"
+                value={datasetLabel}
+                onChange={(event) => setDatasetLabel(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    void handleSubmitCreateDataset();
+                  }
+                }}
+                placeholder="e.g. Personal"
+                autoFocus
+              />
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setCreatingDataset(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="primary-button"
+                type="button"
+                disabled={!datasetLabel.trim()}
+                onClick={() => void handleSubmitCreateDataset()}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

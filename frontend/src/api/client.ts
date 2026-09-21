@@ -6,7 +6,11 @@ import type {
   UserInfo,
 } from "./types";
 
-import { GenerateRecoveryPhrase, Unlock } from "../../wailsjs/go/main/App";
+import {
+  GenerateRecoveryPhrase,
+  Unlock,
+  CreateDataset,
+} from "../../wailsjs/go/main/App";
 
 export async function unlock(recoveryPhrase: string): Promise<boolean> {
   return Unlock(recoveryPhrase);
@@ -27,9 +31,15 @@ export async function getDatasetFiles(datasetId: string): Promise<FileEntry[]> {
 }
 
 export async function createDataset(label: string): Promise<Dataset> {
-  void label;
+  const dataset = await CreateDataset(label);
 
-  throw new Error("Wails createDataset method has not been connected yet.");
+  return {
+    id: dataset.ID,
+    name: dataset.Name,
+    size: dataset.Size,
+    files: dataset.Files,
+    lastBackup: dataset.LastBackup,
+  };
 }
 
 export async function startBackup(
