@@ -12,6 +12,7 @@ import {
   CreateDataset,
   ListDirectory,
   GetHomeDirectory,
+  Backup,
 } from "../../wailsjs/go/main/App";
 
 export async function unlock(recoveryPhrase: string): Promise<boolean> {
@@ -44,14 +45,11 @@ export async function createDataset(label: string): Promise<Dataset> {
   };
 }
 
-export async function startBackup(
+export async function backup(
   datasetId: string,
   paths: string[],
 ): Promise<void> {
-  void datasetId;
-  void paths;
-
-  throw new Error("Wails startBackup method has not been connected yet.");
+  await Backup(datasetId, paths);
 }
 
 export async function restore(

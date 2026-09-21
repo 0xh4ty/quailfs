@@ -270,33 +270,37 @@ func SerializeFiles(files []types.File) []byte {
 	return serializedFiles
 }
 
-func SerializeTree(tree types.Tree) []byte {
-	var serializedTree []byte
-
+func SerializeTrees(trees []types.Tree) []byte {
 	var buf bytes.Buffer
 
-	RootDirectoryLen := uint64(len([]byte(tree.RootDirectory)))
-	RootDirectoryLenBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(RootDirectoryLenBytes, RootDirectoryLen)
-	buf.Write(RootDirectoryLenBytes)
+	treeCount := uint64(len(trees))
+	treeCountBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(treeCountBytes, treeCount)
+	buf.Write(treeCountBytes)
 
-	buf.Write([]byte(tree.RootDirectory))
-	serializedFiles := SerializeFiles(tree.Files)
-	buf.Write(serializedFiles)
+	for _, tree := range trees {
+		rootDirectoryLen := uint64(len([]byte(tree.RootDirectory)))
+		rootDirectoryLenBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(rootDirectoryLenBytes, rootDirectoryLen)
+		buf.Write(rootDirectoryLenBytes)
 
-	childDirectoryCount := uint64(len(tree.ChildDirectories))
-	childDirectoryCountBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(childDirectoryCountBytes, childDirectoryCount)
-	buf.Write(childDirectoryCountBytes)
+		buf.Write([]byte(tree.RootDirectory))
 
-	for i := range tree.ChildDirectories {
-		serializedChildDirectory := SerializeTree(*tree.ChildDirectories[i])
-		buf.Write(serializedChildDirectory)
+		serializedFiles := SerializeFiles(tree.Files)
+		buf.Write(serializedFiles)
+
+		childDirectoryCount := uint64(len(tree.ChildDirectories))
+		childDirectoryCountBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(childDirectoryCountBytes, childDirectoryCount)
+		buf.Write(childDirectoryCountBytes)
+
+		for _, childDirectory := range tree.ChildDirectories {
+			serializedChildDirectory := SerializeTrees([]types.Tree{*childDirectory})
+			buf.Write(serializedChildDirectory)
+		}
 	}
 
-	serializedTree = buf.Bytes()
-
-	return serializedTree
+	return buf.Bytes()
 }
 
 func SerializeMChunks(mchunks []types.MChunk) []byte {
@@ -400,7 +404,7 @@ func SerializeManifestPlain(manifest types.ManifestEnvelope) []byte {
 
 	buf.Write(manifest.ManifestPlain.ParentManifestID)
 
-	serializedTree := SerializeTree(manifest.ManifestPlain.Tree)
+	serializedTree := SerializeTrees(manifest.ManifestPlain.Trees)
 	buf.Write(serializedTree)
 
 	serializedMChunks := SerializeMChunks(manifest.ManifestPlain.MChunks)

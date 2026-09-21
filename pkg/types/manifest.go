@@ -11,7 +11,7 @@ type ManifestPlain struct {
 	DatasetID        []byte
 	Generation       uint64
 	ParentManifestID []byte
-	Tree             Tree
+	Trees            []Tree
 	MChunks          []MChunk
 	MStripes         []MStripe
 	Tombstones       []string

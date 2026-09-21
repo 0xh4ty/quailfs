@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/0xh4ty/quailfs/internal/keys"
+	"github.com/0xh4ty/quailfs/internal/pipeline"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +39,7 @@ type DatasetSession struct {
 	CatalogKey []byte
 	DataKey    []byte
 	NameKey    []byte
+	Label      string
 }
 
 type DatasetInfo struct {
@@ -169,6 +171,7 @@ func (a *App) CreateDataset(label string) (DatasetInfo, error) {
 		CatalogKey: catalogKey,
 		DataKey:    dataKey,
 		NameKey:    nameKey,
+		Label:      label,
 	}
 
 	return DatasetInfo{
@@ -219,4 +222,31 @@ func (a *App) ListDirectory(path string) ([]FileEntry, error) {
 
 func (a *App) GetHomeDirectory() (string, error) {
 	return os.UserHomeDir()
+}
+
+func (a *App) Backup(datasetID string, paths []string) error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	if !a.unlocked {
+		return errors.New("user is not unlocked")
+	}
+
+	dataset, ok := a.datasets[datasetID]
+	if !ok {
+		return errors.New("dataset not found")
+	}
+
+	return pipeline.Backup(
+		paths,
+		a.userID,
+		dataset.DatasetID,
+		dataset.DatasetKey,
+		dataset.CatalogKey,
+		dataset.Label,
+		1,
+		nil,
+		a.x25519PublicKey,
+		a.ed25519PrivateKey,
+	)
 }

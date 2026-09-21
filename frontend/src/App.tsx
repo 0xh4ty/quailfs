@@ -6,6 +6,7 @@ import {
   createDataset,
   listDirectory,
   getHomeDirectory,
+  backup,
 } from "./api/client";
 
 type AppStage = "splash" | "unlock" | "app";
@@ -155,6 +156,20 @@ function App() {
     setBrowsePath(homeDirectory);
     setSelectedPaths(new Set());
     setView("local-browse");
+  };
+
+  const handleBackup = async () => {
+    const paths = Array.from(selectedPaths);
+
+    if (paths.length === 0 || !selectedDatasetId) {
+      return;
+    }
+
+    try {
+      await backup(selectedDatasetId, paths);
+    } catch (error) {
+      console.error("Backup failed:", error);
+    }
   };
 
   const handleStartRestore = () => {
@@ -309,6 +324,7 @@ function App() {
         onDirectoryBack={handleDirectoryBack}
         onOpenDirectory={handleOpenDirectory}
         onToggleSelection={handleToggleSelection}
+        onBackup={handleBackup}
       />
 
       {creatingDataset && (
@@ -518,6 +534,7 @@ type AppShellProps = {
   onDirectoryBack: () => void;
   onOpenDirectory: (entry: BrowseEntry) => void;
   onToggleSelection: (entry: BrowseEntry) => void;
+  onBackup: () => void;
 };
 
 function AppShell({
@@ -540,6 +557,7 @@ function AppShell({
   onDirectoryBack,
   onOpenDirectory,
   onToggleSelection,
+  onBackup,
 }: AppShellProps) {
   return (
     <div className="app-shell">
@@ -576,6 +594,7 @@ function AppShell({
             onDirectoryBack={onDirectoryBack}
             onOpenDirectory={onOpenDirectory}
             onToggleSelection={onToggleSelection}
+            onBackup={onBackup}
           />
         )}
 
@@ -590,6 +609,7 @@ function AppShell({
             onDirectoryBack={onDirectoryBack}
             onOpenDirectory={onOpenDirectory}
             onToggleSelection={onToggleSelection}
+            onBackup={onBackup}
           />
         )}
 
@@ -815,6 +835,7 @@ function BrowseFilesView({
   onDirectoryBack,
   onOpenDirectory,
   onToggleSelection,
+  onBackup,
 }: {
   mode: BrowseMode;
   path: string;
@@ -825,6 +846,7 @@ function BrowseFilesView({
   onDirectoryBack: () => void;
   onOpenDirectory: (entry: BrowseEntry) => void;
   onToggleSelection: (entry: BrowseEntry) => void;
+  onBackup: () => void;
 }) {
   const isLocal = mode === "local";
 
@@ -958,6 +980,7 @@ function BrowseFilesView({
           className="primary-button"
           type="button"
           disabled={selectedPaths.size === 0}
+          onClick={isLocal ? onBackup : undefined}
         >
           {isLocal ? "Start Backup" : "Restore"}
         </button>

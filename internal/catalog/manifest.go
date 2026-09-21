@@ -9,13 +9,13 @@ import (
 	"github.com/0xh4ty/quailfs/pkg/types"
 )
 
-func CreateManifest(datasetID []byte, generation uint64, parentManifestID []byte, tree types.Tree, mchunks []types.MChunk, mstripes []types.MStripe, tombstones []string, catalogKey []byte, ed25519privateKey []byte) (types.ManifestEnvelope, error) {
+func CreateManifest(datasetID []byte, generation uint64, parentManifestID []byte, trees []types.Tree, mchunks []types.MChunk, mstripes []types.MStripe, tombstones []string, catalogKey []byte, ed25519privateKey []byte) (types.ManifestEnvelope, error) {
 	var manifest types.ManifestEnvelope
 
 	manifest.ManifestPlain.DatasetID = datasetID
 	manifest.ManifestPlain.Generation = generation
 	manifest.ManifestPlain.ParentManifestID = parentManifestID
-	manifest.ManifestPlain.Tree = tree
+	manifest.ManifestPlain.Trees = trees
 	manifest.ManifestPlain.MChunks = mchunks
 	manifest.ManifestPlain.MStripes = mstripes
 	manifest.ManifestPlain.Tombstones = tombstones
