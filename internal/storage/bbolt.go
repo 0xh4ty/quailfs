@@ -2,12 +2,20 @@ package storage
 
 import (
 	"errors"
-
 	"go.etcd.io/bbolt"
+	"os"
+	"path/filepath"
 )
 
 func InitializeDatabase() (*bbolt.DB, error) {
-	db, err := bbolt.Open("../../node-data/bbolt/quailfs.db", 0600, nil)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	file := filepath.Join(homeDir, ".node-data", "quailfs.db")
+
+	db, err := bbolt.Open(file, 0600, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -39,6 +47,11 @@ func InitializeDatabase() (*bbolt.DB, error) {
 		}
 
 		_, err = tx.CreateBucketIfNotExists([]byte("bootstrap"))
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.CreateBucketIfNotExists([]byte("node_private_key"))
 		if err != nil {
 			return err
 		}

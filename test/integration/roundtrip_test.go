@@ -8,6 +8,7 @@ import (
 	"github.com/0xh4ty/quailfs/internal/keys"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -27,7 +28,8 @@ func TestBackupRoundTrip(t *testing.T) {
 
 	// ------------- Backup --------------
 
-	file := "../../node-data/test_file.txt"
+	homeDir, _ := os.UserHomeDir()
+	file := filepath.Join(homeDir, ".node-data", "test_file.txt")
 
 	data_first, _ := os.ReadFile(file)
 
