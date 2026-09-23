@@ -7,11 +7,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/0xh4ty/quailfs/internal/config"
+	"github.com/0xh4ty/quailfs/internal/network"
 	"github.com/0xh4ty/quailfs/internal/storage"
-	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
+	net "github.com/libp2p/go-libp2p/core/network"
 	"log"
 	"os"
 	"path/filepath"
@@ -90,26 +90,7 @@ func RunNode(enableRelay bool) {
 		privKey = dbPrivKey
 	}
 
-	libp2pOptions := []libp2p.Option{
-		libp2p.Identity(privKey),
-		libp2p.ListenAddrStrings(
-			"/ip4/0.0.0.0/tcp/4001",
-			"/ip4/0.0.0.0/udp/4001/quic-v1",
-		),
-		libp2p.EnableAutoNATv2(),
-		libp2p.EnableNATService(),
-		libp2p.EnableRelay(),
-		libp2p.EnableHolePunching(),
-	}
-
-	if enableRelay {
-		libp2pOptions = append(
-			libp2pOptions,
-			libp2p.EnableRelayService(),
-		)
-	}
-
-	node, err := libp2p.New(libp2pOptions...)
+	node, err := network.NewHost(privKey, enableRelay)
 	if err != nil {
 		panic(err)
 	}
@@ -159,7 +140,7 @@ func startPeerWithBootstrapNodes(
 ) {
 }
 
-func handleStream(s network.Stream) {
+func handleStream(s net.Stream) {
 	defer s.Close()
 
 	log.Println("Got a new stream!")
