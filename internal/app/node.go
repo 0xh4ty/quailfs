@@ -165,7 +165,7 @@ func startPeerWithBootstrapNodes(
 	bootstrapNodes []string,
 ) (*dht.IpfsDHT, error) {
 
-	var lastErr error
+	log.Println("Starting DHT...")
 
 	kad, err := dht.New(
 		node,
@@ -176,6 +176,10 @@ func startPeerWithBootstrapNodes(
 	}
 
 	log.Println("DHT started")
+
+	var lastErr error
+	var connectedPeer peer.ID
+	connectedAny := false
 
 	for _, address := range bootstrapNodes {
 		log.Printf("Connecting to bootstrap node: %s\n", address)
@@ -226,30 +230,37 @@ func startPeerWithBootstrapNodes(
 			addrInfo.ID,
 		)
 
-		if err := kad.Bootstrap(ctx); err != nil {
-			kad.Close()
-			return nil, err
-		}
+		kad.RoutingTable().TryAddPeer(addrInfo.ID, true, false)
 
-		log.Println("DHT bootstrap completed")
-
-		if err := verifyDHTDiscovery(
-			ctx,
-			kad,
-			addrInfo.ID,
-		); err != nil {
-			kad.Close()
-			return nil, err
-		}
-
-		return kad, nil
+		connectedPeer = addrInfo.ID
+		connectedAny = true
 	}
 
-	if lastErr == nil {
-		lastErr = fmt.Errorf("no valid bootstrap nodes")
+	if !connectedAny {
+		if lastErr == nil {
+			lastErr = fmt.Errorf("no valid bootstrap nodes")
+		}
+		kad.Close()
+		return nil, lastErr
 	}
 
-	return nil, lastErr
+	if err := kad.Bootstrap(ctx); err != nil {
+		kad.Close()
+		return nil, err
+	}
+
+	log.Println("DHT bootstrap completed")
+
+	if err := verifyDHTDiscovery(
+		ctx,
+		kad,
+		connectedPeer,
+	); err != nil {
+		kad.Close()
+		return nil, err
+	}
+
+	return kad, nil
 }
 
 func handleStream(s net.Stream) {
