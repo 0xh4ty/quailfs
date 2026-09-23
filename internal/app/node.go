@@ -167,6 +167,16 @@ func startPeerWithBootstrapNodes(
 
 	var lastErr error
 
+	kad, err := dht.New(
+		node,
+		dht.Mode(dht.ModeServer),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("DHT started")
+
 	for _, address := range bootstrapNodes {
 		log.Printf("Connecting to bootstrap node: %s\n", address)
 
@@ -215,16 +225,6 @@ func startPeerWithBootstrapNodes(
 			"Connected to bootstrap peer: %s\n",
 			addrInfo.ID,
 		)
-
-		kad, err := dht.New(
-			node,
-			dht.Mode(dht.ModeServer),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		log.Println("DHT started")
 
 		if err := kad.Bootstrap(ctx); err != nil {
 			kad.Close()
