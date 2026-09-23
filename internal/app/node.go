@@ -233,6 +233,15 @@ func startPeerWithBootstrapNodes(
 
 		log.Println("DHT bootstrap completed")
 
+		if err := verifyDHTDiscovery(
+			ctx,
+			kad,
+			addrInfo.ID,
+		); err != nil {
+			kad.Close()
+			return nil, err
+		}
+
 		return kad, nil
 	}
 
@@ -253,4 +262,53 @@ func handleStream(s net.Stream) {
 
 	_ = reader
 	_ = writer
+}
+
+func verifyDHTDiscovery(
+	ctx context.Context,
+	kad *dht.IpfsDHT,
+	target peer.ID,
+) error {
+
+	log.Printf(
+		"Verifying DHT discovery of peer: %s\n",
+		target,
+	)
+
+	lookupCtx, cancel := context.WithTimeout(
+		ctx,
+		15*time.Second,
+	)
+	defer cancel()
+
+	peers, err := kad.GetClosestPeers(
+		lookupCtx,
+		string(target),
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"DHT peer lookup failed: %w",
+			err,
+		)
+	}
+
+	for _, p := range peers {
+		log.Printf(
+			"DHT discovered peer: %s\n",
+			p,
+		)
+
+		if p == target {
+			log.Printf(
+				"DHT discovery verified: %s\n",
+				target,
+			)
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"DHT lookup completed but target peer %s was not found",
+		target,
+	)
 }
