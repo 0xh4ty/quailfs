@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"github.com/0xh4ty/quailfs/internal/config"
 	"github.com/0xh4ty/quailfs/internal/storage"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -17,7 +18,6 @@ import (
 )
 
 func RunNode(enableRelay bool) {
-	var bootstrapNodes []string
 	var privKey crypto.PrivKey
 	var dbPrivKey crypto.PrivKey
 
@@ -133,6 +133,9 @@ func RunNode(enableRelay bool) {
 	} else {
 		log.Println("Relay service disabled")
 	}
+
+	bootstrapConfigPath := filepath.Join(nodeDataDir, "bootstrap.config")
+	bootstrapNodes, err := config.ReadBootstrapConfig(bootstrapConfigPath)
 
 	if len(bootstrapNodes) == 0 {
 		startPeer(ctx, node)
