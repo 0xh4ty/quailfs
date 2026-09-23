@@ -15,9 +15,13 @@ func main() {
 		fmt.Println("Starting Client...")
 		app.RunClient()
 
+	case os.Args[1] == "--node" && len(os.Args) > 2 && os.Args[2] == "--relay":
+		fmt.Println("Starting Node with Relay...")
+		app.RunNode(true)
+
 	case os.Args[1] == "--node":
 		fmt.Println("Starting Node...")
-		app.RunNode()
+		app.RunNode(false)
 
 	case os.Args[1] == "--generate-mnemonic":
 		fmt.Println("Generating Mnemonic")
@@ -25,7 +29,7 @@ func main() {
 
 	default:
 		fmt.Println("Unknown argument:", os.Args[1])
-		fmt.Println("Usage: quailfs [--node]")
+		fmt.Println("Usage: quailfs [--node] [--relay]")
 		os.Exit(1)
 	}
 }
