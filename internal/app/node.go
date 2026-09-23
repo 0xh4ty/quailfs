@@ -9,12 +9,16 @@ import (
 	"github.com/0xh4ty/quailfs/internal/config"
 	"github.com/0xh4ty/quailfs/internal/network"
 	"github.com/0xh4ty/quailfs/internal/storage"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	net "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 func RunNode(enableRelay bool) {
@@ -118,26 +122,125 @@ func RunNode(enableRelay bool) {
 	bootstrapConfigPath := filepath.Join(nodeDataDir, "bootstrap.config")
 	bootstrapNodes, err := config.ReadBootstrapConfig(bootstrapConfigPath)
 
+	var kad *dht.IpfsDHT
+
 	if len(bootstrapNodes) == 0 {
-		startPeer(ctx, node)
+		kad, err = startPeer(node)
 	} else {
-		startPeerWithBootstrapNodes(ctx, node, bootstrapNodes)
+		kad, err = startPeerWithBootstrapNodes(
+			ctx,
+			node,
+			bootstrapNodes,
+		)
 	}
+	if err != nil {
+		panic(err)
+	}
+
+	defer kad.Close()
 
 	select {}
 }
 
-func startPeer(
-	ctx context.Context,
-	node host.Host,
-) {
+func startPeer(node host.Host) (*dht.IpfsDHT, error) {
+
+	log.Println("Starting DHT...")
+
+	kad, err := dht.New(
+		node,
+		dht.Mode(dht.ModeServer),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("DHT started")
+
+	return kad, nil
 }
 
 func startPeerWithBootstrapNodes(
 	ctx context.Context,
 	node host.Host,
 	bootstrapNodes []string,
-) {
+) (*dht.IpfsDHT, error) {
+
+	var lastErr error
+
+	for _, address := range bootstrapNodes {
+		log.Printf("Connecting to bootstrap node: %s\n", address)
+
+		maddr, err := ma.NewMultiaddr(address)
+		if err != nil {
+			log.Printf(
+				"Invalid bootstrap multiaddress %q: %v\n",
+				address,
+				err,
+			)
+			lastErr = err
+			continue
+		}
+
+		addrInfo, err := peer.AddrInfoFromP2pAddr(maddr)
+		if err != nil {
+			log.Printf(
+				"Invalid bootstrap peer address %q: %v\n",
+				address,
+				err,
+			)
+			lastErr = err
+			continue
+		}
+
+		connectCtx, cancel := context.WithTimeout(
+			ctx,
+			10*time.Second,
+		)
+
+		err = node.Connect(connectCtx, *addrInfo)
+
+		cancel()
+
+		if err != nil {
+			log.Printf(
+				"Failed to connect to bootstrap node %s: %v\n",
+				address,
+				err,
+			)
+			lastErr = err
+			continue
+		}
+
+		log.Printf(
+			"Connected to bootstrap peer: %s\n",
+			addrInfo.ID,
+		)
+
+		kad, err := dht.New(
+			node,
+			dht.Mode(dht.ModeServer),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		log.Println("DHT started")
+
+		if err := kad.Bootstrap(ctx); err != nil {
+			kad.Close()
+			return nil, err
+		}
+
+		log.Println("DHT bootstrap completed")
+
+		return kad, nil
+	}
+
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no valid bootstrap nodes")
+	}
+
+	return nil, lastErr
 }
 
 func handleStream(s net.Stream) {
