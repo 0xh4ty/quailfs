@@ -138,9 +138,9 @@ func RunNode(enableRelay bool) {
 	}
 	log.Println()
 
-   for _, p := range node.Mux().Protocols() {
-       log.Println("supported protocol:", p)
-   }
+	for _, p := range node.Mux().Protocols() {
+		log.Println("supported protocol:", p)
+	}
 
 	node.SetStreamHandler(
 		"/quailfs/1.0.0",
