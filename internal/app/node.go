@@ -96,9 +96,6 @@ func RunNode(enableRelay bool) {
 
 	bootstrapConfigPath := filepath.Join(nodeDataDir, "bootstrap.config")
 	bootstrapNodes, err := config.ReadBootstrapConfig(bootstrapConfigPath)
-	if err != nil {
-		panic(err)
-	}
 
 	var staticRelays []peer.AddrInfo
 	if !enableRelay {
