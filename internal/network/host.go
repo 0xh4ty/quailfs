@@ -4,9 +4,14 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-func NewHost(privKey crypto.PrivKey, enableRelay bool) (host.Host, error) {
+func NewHost(
+	privKey crypto.PrivKey,
+	enableRelay bool,
+	staticRelays []peer.AddrInfo,
+) (host.Host, error) {
 	options := []libp2p.Option{
 		libp2p.Identity(privKey),
 
@@ -25,6 +30,11 @@ func NewHost(privKey crypto.PrivKey, enableRelay bool) (host.Host, error) {
 		options = append(
 			options,
 			libp2p.EnableRelayService(),
+		)
+	} else if len(staticRelays) > 0 {
+		options = append(
+			options,
+			libp2p.EnableAutoRelayWithStaticRelays(staticRelays),
 		)
 	}
 

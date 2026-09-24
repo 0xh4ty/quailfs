@@ -94,7 +94,40 @@ func RunNode(enableRelay bool) {
 		privKey = dbPrivKey
 	}
 
-	node, err := network.NewHost(privKey, enableRelay)
+	bootstrapConfigPath := filepath.Join(nodeDataDir, "bootstrap.config")
+	bootstrapNodes, err := config.ReadBootstrapConfig(bootstrapConfigPath)
+	if err != nil {
+		panic(err)
+	}
+
+	var staticRelays []peer.AddrInfo
+	if !enableRelay {
+		for _, address := range bootstrapNodes {
+			maddr, err := ma.NewMultiaddr(address)
+			if err != nil {
+				log.Printf(
+					"Invalid bootstrap multiaddress %q, skipping for relay use: %v\n",
+					address,
+					err,
+				)
+				continue
+			}
+
+			addrInfo, err := peer.AddrInfoFromP2pAddr(maddr)
+			if err != nil {
+				log.Printf(
+					"Invalid bootstrap peer address %q, skipping for relay use: %v\n",
+					address,
+					err,
+				)
+				continue
+			}
+
+			staticRelays = append(staticRelays, *addrInfo)
+		}
+	}
+
+	node, err := network.NewHost(privKey, enableRelay, staticRelays)
 	if err != nil {
 		panic(err)
 	}
@@ -118,9 +151,6 @@ func RunNode(enableRelay bool) {
 	} else {
 		log.Println("Relay service disabled")
 	}
-
-	bootstrapConfigPath := filepath.Join(nodeDataDir, "bootstrap.config")
-	bootstrapNodes, err := config.ReadBootstrapConfig(bootstrapConfigPath)
 
 	var kad *dht.IpfsDHT
 
