@@ -100,3 +100,14 @@ func Get(db *bbolt.DB, bucketName string, key []byte) ([]byte, error) {
 	}
 	return value, nil
 }
+
+func Delete(db *bbolt.DB, bucketName string, key []byte) error {
+	return db.Update(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return errors.New("bucket not found")
+		}
+
+		return bucket.Delete(key)
+	})
+}
