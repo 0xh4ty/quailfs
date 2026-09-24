@@ -139,6 +139,8 @@ func RunNode(enableRelay bool) {
 
 	defer kad.Close()
 
+	go watchRoutingTable(ctx, kad)
+
 	select {}
 }
 
@@ -322,4 +324,29 @@ func verifyDHTDiscovery(
 		"DHT lookup completed but target peer %s was not found",
 		target,
 	)
+}
+
+func watchRoutingTable(ctx context.Context, kad *dht.IpfsDHT) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			peers := kad.RoutingTable().ListPeers()
+			log.Printf("Routing table size: %d\n", len(peers))
+			for _, p := range peers {
+				log.Printf("  - %s\n", p)
+			}
+
+			refreshErrCh := kad.RefreshRoutingTable()
+			go func() {
+				if err := <-refreshErrCh; err != nil {
+					log.Printf("Routing table refresh error: %v\n", err)
+				}
+			}()
+		}
+	}
 }
