@@ -138,8 +138,11 @@ func RunNode(enableRelay bool) {
 	}
 	log.Println()
 
+	time.Sleep(3 * time.Second)
+
+	log.Println("protocols after delay:")
 	for _, p := range node.Mux().Protocols() {
-		log.Println("supported protocol:", p)
+		log.Println("  -", p)
 	}
 
 	node.SetStreamHandler(
