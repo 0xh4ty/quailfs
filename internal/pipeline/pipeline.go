@@ -335,32 +335,36 @@ func Backup(ctx context.Context, paths []string, userID []byte, datasetID []byte
 		return fmt.Errorf("generate manifest suffix: %w", err)
 	}
 
-	userIndexName := fmt.Sprintf("userindex:%x:%s", userIndexKey, userIndexSuffix)
-	headName := fmt.Sprintf("head:%x:%s", headKey, headSuffix)
-	manifestName := fmt.Sprintf("manifest:%x:%s", manifest.ManifestID, manifestSuffix)
-
 	userIndexData := backup.SerializeUserIndex(userIndex)
 	headData := backup.SerializeHead(head)
 	wrappedDatasetData := backup.SerializeWrappedDataset(wrappedDataset)
 	headCatalogData := append(headData, wrappedDatasetData...)
 	manifestData := backup.SerializeManifestEnvelope(manifest)
 
-	catalogObjects := []catalogObject{
-		{
-			name:       userIndexName,
-			objectType: 1,
-			data:       userIndexData,
-		},
-		{
-			name:       headName,
-			objectType: 2,
-			data:       headCatalogData,
-		},
-		{
-			name:       manifestName,
-			objectType: 4,
-			data:       manifestData,
-		},
+	var catalogObjects []catalogObject
+
+	for i := range 12 {
+		userIndexName := fmt.Sprintf("userindex:%x:%s:%02d", userIndexKey, userIndexSuffix, i)
+		headName := fmt.Sprintf("head:%x:%s:%02d", headKey, headSuffix, i)
+		manifestName := fmt.Sprintf("manifest:%x:%s:%02d", manifest.ManifestID, manifestSuffix, i)
+
+		catalogObjects = append(catalogObjects,
+			catalogObject{
+				name:       userIndexName,
+				objectType: 1,
+				data:       userIndexData,
+			},
+			catalogObject{
+				name:       headName,
+				objectType: 2,
+				data:       headCatalogData,
+			},
+			catalogObject{
+				name:       manifestName,
+				objectType: 4,
+				data:       manifestData,
+			},
+		)
 	}
 
 	catalogNames := make([]string, 0, len(catalogObjects))
