@@ -3,6 +3,7 @@ package backup
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"github.com/0xh4ty/quailfs/pkg/types"
 )
 
@@ -462,4 +463,272 @@ func SerializeManifestEnvelope(manifest types.ManifestEnvelope) []byte {
 	buf.Write(manifest.ManifestID)
 
 	return buf.Bytes()
+}
+
+func DeserializeUserIndex(data []byte) (types.UserIndex, error) {
+	var userIndex types.UserIndex
+	position := 0
+
+	if len(data) < 8 {
+		return types.UserIndex{}, fmt.Errorf("invalid user index: missing schema")
+	}
+
+	userIndex.Body.Schema = binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	if len(data) < position+32 {
+		return types.UserIndex{}, fmt.Errorf("invalid user index: missing user ID")
+	}
+
+	userIndex.Body.UserID = data[position : position+32]
+	position += 32
+
+	if len(data) < position+8 {
+		return types.UserIndex{}, fmt.Errorf("invalid user index: missing generation")
+	}
+
+	userIndex.Body.Generation = binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	if len(data) < position+8 {
+		return types.UserIndex{}, fmt.Errorf("invalid user index: missing dataset count")
+	}
+
+	datasetCount := binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	for range datasetCount {
+		if len(data) < position+32 {
+			return types.UserIndex{}, fmt.Errorf("invalid user index: missing dataset ID")
+		}
+
+		datasetID := data[position : position+32]
+		position += 32
+
+		if len(data) < position+8 {
+			return types.UserIndex{}, fmt.Errorf("invalid user index: missing label length")
+		}
+
+		labelLen := binary.BigEndian.Uint64(data[position : position+8])
+		position += 8
+
+		if len(data) < position+int(labelLen) {
+			return types.UserIndex{}, fmt.Errorf("invalid user index: truncated label")
+		}
+
+		label := string(data[position : position+int(labelLen)])
+		position += int(labelLen)
+
+		if len(data) < position+8 {
+			return types.UserIndex{}, fmt.Errorf("invalid user index: missing dataset generation")
+		}
+
+		generation := binary.BigEndian.Uint64(data[position : position+8])
+		position += 8
+
+		userIndex.Body.Datasets = append(userIndex.Body.Datasets, types.DatasetEntry{
+			DatasetID:  datasetID,
+			Label:      label,
+			Generation: generation,
+		})
+	}
+
+	const timestampLen = len("2006-01-02T15:04:05Z07:00")
+
+	if len(data) < position+timestampLen+64 {
+		return types.UserIndex{}, fmt.Errorf("invalid user index: missing timestamp or signature")
+	}
+
+	userIndex.Body.UpdatedAt = string(data[position : position+timestampLen])
+	position += timestampLen
+
+	userIndex.Sig.Signature = data[position : position+64]
+
+	return userIndex, nil
+}
+
+func DeserializeWrappedDataset(data []byte) (types.WrappedDataset, error) {
+	var wrappedDataset types.WrappedDataset
+	position := 0
+
+	if len(data) < 32 {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: missing user ID")
+	}
+
+	wrappedDataset.Body.UserID = data[position : position+32]
+	position += 32
+
+	if len(data) < position+32 {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: missing dataset ID")
+	}
+
+	wrappedDataset.Body.DatasetID = data[position : position+32]
+	position += 32
+
+	if len(data) < position+8 {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: missing label length")
+	}
+
+	labelLen := binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	if len(data) < position+int(labelLen) {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: truncated label")
+	}
+
+	wrappedDataset.Body.Label = string(data[position : position+int(labelLen)])
+	position += int(labelLen)
+
+	if len(data) < position+8 {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: missing generation")
+	}
+
+	wrappedDataset.Body.Generation = binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	if len(data) < position+32 {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: missing user X25519 public key")
+	}
+
+	wrappedDataset.Body.UserX25519Pubkey = data[position : position+32]
+	position += 32
+
+	if len(data) < position+32 {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: missing ephemeral X25519 public key")
+	}
+
+	wrappedDataset.Body.EphX25519Pubkey = data[position : position+32]
+	position += 32
+
+	if len(data) < position+8 {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: missing encrypted key length")
+	}
+
+	encDatasetKeyLen := binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	if len(data) < position+int(encDatasetKeyLen)+64 {
+		return types.WrappedDataset{}, fmt.Errorf("invalid wrapped dataset: truncated encrypted key or signature")
+	}
+
+	wrappedDataset.Body.EncDatasetKey = data[position : position+int(encDatasetKeyLen)]
+	position += int(encDatasetKeyLen)
+
+	wrappedDataset.Sig.Signature = data[position : position+64]
+
+	return wrappedDataset, nil
+}
+
+func deserializeHeadWithLength(data []byte) (types.Head, int, error) {
+	var head types.Head
+	position := 0
+
+	if len(data) < 8 {
+		return types.Head{}, 0, fmt.Errorf("invalid head: missing schema")
+	}
+
+	head.Body.Schema = binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	if len(data) < position+32 {
+		return types.Head{}, 0, fmt.Errorf("invalid head: missing user ID")
+	}
+
+	head.Body.UserID = data[position : position+32]
+	position += 32
+
+	if len(data) < position+32 {
+		return types.Head{}, 0, fmt.Errorf("invalid head: missing dataset ID")
+	}
+
+	head.Body.DatasetID = data[position : position+32]
+	position += 32
+
+	if len(data) < position+8 {
+		return types.Head{}, 0, fmt.Errorf("invalid head: missing generation")
+	}
+
+	head.Body.Generation = binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	if len(data) < position+32 {
+		return types.Head{}, 0, fmt.Errorf("invalid head: missing manifest ID")
+	}
+
+	head.Body.ManifestID = data[position : position+32]
+	position += 32
+
+	if len(data) < position+8 {
+		return types.Head{}, 0, fmt.Errorf("invalid head: missing peer hint count")
+	}
+
+	hintCount := binary.BigEndian.Uint64(data[position : position+8])
+	position += 8
+
+	const catalogPeerHintSize = 32
+
+	for range hintCount {
+		if len(data) < position+catalogPeerHintSize {
+			return types.Head{}, 0, fmt.Errorf("invalid head: truncated catalog peer hint")
+		}
+
+		head.Body.CatalogPeerHints = append(head.Body.CatalogPeerHints, data[position:position+catalogPeerHintSize])
+		position += catalogPeerHintSize
+	}
+
+	const timestampLen = len("2006-01-02T15:04:05Z07:00")
+
+	if len(data) < position+timestampLen+64 {
+		return types.Head{}, 0, fmt.Errorf("invalid head: missing timestamp or signature")
+	}
+
+	head.Body.CreatedAt = string(data[position : position+timestampLen])
+	position += timestampLen
+
+	head.Sig.Signature = data[position : position+64]
+	position += 64
+
+	return head, position, nil
+}
+
+func DeserializeHead(data []byte) (types.Head, error) {
+	head, _, err := deserializeHeadWithLength(data)
+	if err != nil {
+		return types.Head{}, err
+	}
+
+	return head, nil
+}
+
+func DeserializeHeadCatalog(data []byte) (types.Head, types.WrappedDataset, error) {
+	head, position, err := deserializeHeadWithLength(data)
+	if err != nil {
+		return types.Head{}, types.WrappedDataset{}, err
+	}
+
+	wrappedDataset, err := DeserializeWrappedDataset(data[position:])
+	if err != nil {
+		return types.Head{}, types.WrappedDataset{}, fmt.Errorf("deserialize wrapped dataset: %w", err)
+	}
+
+	return head, wrappedDataset, nil
+}
+
+func DeserializeManifestEnvelope(data []byte) (types.ManifestEnvelope, error) {
+	const signatureLen = 64
+	const manifestIDLen = 32
+
+	if len(data) < signatureLen+manifestIDLen {
+		return types.ManifestEnvelope{}, fmt.Errorf("invalid manifest envelope")
+	}
+
+	envelopeEnd := len(data) - signatureLen - manifestIDLen
+
+	var manifest types.ManifestEnvelope
+
+	manifest.Envelope = data[:envelopeEnd]
+	manifest.Sig.Signature = data[envelopeEnd : envelopeEnd+signatureLen]
+	manifest.ManifestID = data[envelopeEnd+signatureLen:]
+
+	return manifest, nil
 }
