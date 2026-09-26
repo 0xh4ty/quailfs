@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"io"
 )
 
 const PutShardProtocol = "/quailfs/put-shard/1.0.0"
@@ -119,4 +120,24 @@ func PutCatalog(ctx context.Context, h host.Host, peerID peer.ID, objectName str
 	}
 
 	return nil
+}
+
+func readString(reader *bufio.Reader) (string, error) {
+	var length uint64
+
+	if err := binary.Read(reader, binary.BigEndian, &length); err != nil {
+		return "", err
+	}
+
+	if length > uint64(^uint(0)>>1) {
+		return "", fmt.Errorf("string too large")
+	}
+
+	data := make([]byte, int(length))
+
+	if _, err := io.ReadFull(reader, data); err != nil {
+		return "", err
+	}
+
+	return string(data), nil
 }

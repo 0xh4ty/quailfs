@@ -732,3 +732,22 @@ func DeserializeManifestEnvelope(data []byte) (types.ManifestEnvelope, error) {
 
 	return manifest, nil
 }
+
+func DeserializeCatalogObject(objectType uint8, data []byte) error {
+	switch objectType {
+	case 1:
+		_, err := DeserializeUserIndex(data)
+		return err
+
+	case 2:
+		_, _, err := DeserializeHeadCatalog(data)
+		return err
+
+	case 4:
+		_, err := DeserializeManifestEnvelope(data)
+		return err
+
+	default:
+		return fmt.Errorf("unknown catalog object type: %d", objectType)
+	}
+}
