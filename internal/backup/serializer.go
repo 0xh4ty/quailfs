@@ -420,3 +420,46 @@ func SerializeManifestPlain(manifest types.ManifestEnvelope) []byte {
 
 	return serializedManifestPlain
 }
+
+func SerializeHead(head types.Head) []byte {
+	var buf bytes.Buffer
+
+	serializedBody := SerializeHeadBody(head)
+	buf.Write(serializedBody)
+
+	buf.Write(head.Sig.Signature)
+
+	return buf.Bytes()
+}
+
+func SerializeUserIndex(userIndex types.UserIndex) []byte {
+	var buf bytes.Buffer
+
+	serializedBody := SerializeUserIndexBody(userIndex)
+	buf.Write(serializedBody)
+
+	buf.Write(userIndex.Sig.Signature)
+
+	return buf.Bytes()
+}
+
+func SerializeWrappedDataset(wrappedDataset types.WrappedDataset) []byte {
+	var buf bytes.Buffer
+
+	serializedBody := SerializeWrappedDatasetBody(wrappedDataset)
+	buf.Write(serializedBody)
+
+	buf.Write(wrappedDataset.Sig.Signature)
+
+	return buf.Bytes()
+}
+
+func SerializeManifestEnvelope(manifest types.ManifestEnvelope) []byte {
+	var buf bytes.Buffer
+
+	buf.Write(manifest.Envelope)
+	buf.Write(manifest.Sig.Signature)
+	buf.Write(manifest.ManifestID)
+
+	return buf.Bytes()
+}
