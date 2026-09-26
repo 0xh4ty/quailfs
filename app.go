@@ -6,6 +6,8 @@ import (
 	"errors"
 	"github.com/0xh4ty/quailfs/internal/keys"
 	"github.com/0xh4ty/quailfs/internal/pipeline"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +26,7 @@ type App struct {
 	ed25519PublicKey  []byte
 	x25519PrivateKey  []byte
 	x25519PublicKey   []byte
+	libp2pPrivateKey  crypto.PrivKey
 
 	datasets map[string]DatasetSession
 }
@@ -91,6 +94,11 @@ func (a *App) Unlock(recoveryPhrase string) (bool, error) {
 
 	ed25519PrivateKey, ed25519PublicKey := keys.DeriveEd25519Keypair(ed25519Seed)
 
+	libp2pPrivateKey, err := crypto.UnmarshalEd25519PrivateKey(ed25519PrivateKey)
+	if err != nil {
+		return false, err
+	}
+
 	x25519Seed, err := keys.DeriveX25519Seed(mnemonicSeed)
 	if err != nil {
 		return false, err
@@ -111,6 +119,7 @@ func (a *App) Unlock(recoveryPhrase string) (bool, error) {
 	a.ed25519PublicKey = ed25519PublicKey
 	a.x25519PrivateKey = x25519PrivateKey
 	a.x25519PublicKey = x25519PublicKey
+	a.libp2pPrivateKey = libp2pPrivateKey
 	a.unlocked = true
 
 	return true, nil
@@ -238,6 +247,7 @@ func (a *App) Backup(datasetID string, paths []string) error {
 	}
 
 	return pipeline.Backup(
+		a.ctx,
 		paths,
 		a.userID,
 		dataset.DatasetID,
@@ -248,5 +258,7 @@ func (a *App) Backup(datasetID string, paths []string) error {
 		nil,
 		a.x25519PublicKey,
 		a.ed25519PrivateKey,
+		a.libp2pPrivateKey,
+		[]peer.AddrInfo{},
 	)
 }

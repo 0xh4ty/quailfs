@@ -1,22 +1,29 @@
 package pipeline
 
 import (
+	"context"
+	crand "crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"github.com/0xh4ty/quailfs/internal/backup"
 	"github.com/0xh4ty/quailfs/internal/catalog"
 	"github.com/0xh4ty/quailfs/internal/codec"
 	"github.com/0xh4ty/quailfs/internal/keys"
+	"github.com/0xh4ty/quailfs/internal/network"
+	"github.com/0xh4ty/quailfs/internal/place"
 	"github.com/0xh4ty/quailfs/pkg/types"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"os"
 	"path/filepath"
 )
 
 type BackupResult struct {
-	Manifest       types.ManifestEnvelope
-	Head           types.Head
-	WrappedDataset types.WrappedDataset
-	UserIndex      types.UserIndex
-
+	Manifest        types.ManifestEnvelope
+	Head            types.Head
+	WrappedDataset  types.WrappedDataset
+	UserIndex       types.UserIndex
 	StripeIDs       [][]byte
 	ShardCollection [][][]byte
 }
@@ -26,33 +33,30 @@ type backupShards struct {
 	shards    [][][]byte
 }
 
-func backupFile(
-	path string,
-	datasetID []byte,
-	datasetKey []byte,
-) (types.File, []types.MChunk, []types.MStripe, backupShards, error) {
+type catalogObject struct {
+	name       string
+	objectType uint8
+	data       []byte
+}
+
+func backupFile(path string, datasetID []byte, datasetKey []byte) (types.File, []types.MChunk, []types.MStripe, backupShards, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return types.File{}, nil, nil, backupShards{},
-			fmt.Errorf("read %q: %w", path, err)
+		return types.File{}, nil, nil, backupShards{}, fmt.Errorf("read %q: %w", path, err)
 	}
 
 	qchunks, err := backup.Chunker(data)
 	if err != nil {
-		return types.File{}, nil, nil, backupShards{},
-			fmt.Errorf("chunk %q: %w", path, err)
+		return types.File{}, nil, nil, backupShards{}, fmt.Errorf("chunk %q: %w", path, err)
 	}
 
 	compressedQChunks, err := codec.Compressor(qchunks)
 	if err != nil {
-		return types.File{}, nil, nil, backupShards{},
-			fmt.Errorf("compress %q: %w", path, err)
+		return types.File{}, nil, nil, backupShards{}, fmt.Errorf("compress %q: %w", path, err)
 	}
 
 	packedStripePlain := backup.PackChunks(compressedQChunks)
-	packedStripeSerialized := backup.SerializePackedPlainCollection(
-		packedStripePlain,
-	)
+	packedStripeSerialized := backup.SerializePackedPlainCollection(packedStripePlain)
 
 	file := types.File{
 		FileName: filepath.Base(path),
@@ -76,40 +80,31 @@ func backupFile(
 	for _, stripe := range packedStripeSerialized {
 		stripeID := keys.DeriveStripeID(datasetID, stripe)
 
-		stripeKey, err := keys.DeriveStripeKey(
-			datasetKey,
-			datasetID,
-			stripeID,
-		)
+		stripeKey, err := keys.DeriveStripeKey(datasetKey, datasetID, stripeID)
 		if err != nil {
-			return types.File{}, nil, nil, backupShards{},
-				fmt.Errorf("derive stripe key: %w", err)
+			return types.File{}, nil, nil, backupShards{}, fmt.Errorf("derive stripe key: %w", err)
 		}
 
-		nonce96, err := keys.DeriveNonce96(
-			stripeKey,
-			datasetID,
-			stripeID,
-		)
+		nonce96, err := keys.DeriveNonce96(stripeKey, datasetID, stripeID)
 		if err != nil {
-			return types.File{}, nil, nil, backupShards{},
-				fmt.Errorf("derive nonce: %w", err)
+			return types.File{}, nil, nil, backupShards{}, fmt.Errorf("derive nonce: %w", err)
 		}
 
-		encryptedStripe, err := codec.EncryptStripe(
-			stripeKey,
-			nonce96,
-			stripe,
-		)
+		encryptedStripe, err := codec.EncryptStripe(stripeKey, nonce96, stripe)
 		if err != nil {
-			return types.File{}, nil, nil, backupShards{},
-				fmt.Errorf("encrypt stripe: %w", err)
+			return types.File{}, nil, nil, backupShards{}, fmt.Errorf("encrypt stripe: %w", err)
 		}
 
 		shards, err := codec.EncodeStripe(encryptedStripe)
 		if err != nil {
-			return types.File{}, nil, nil, backupShards{},
-				fmt.Errorf("encode stripe: %w", err)
+			return types.File{}, nil, nil, backupShards{}, fmt.Errorf("encode stripe: %w", err)
+		}
+
+		shardNames := make([][]byte, len(shards))
+
+		for i := range shards {
+			shardName := fmt.Sprintf("%x%02X", stripeID, i)
+			shardNames[i] = []byte(shardName)
 		}
 
 		stripeIDs = append(stripeIDs, stripeID)
@@ -120,7 +115,7 @@ func backupFile(
 			K:          8,
 			N:          12,
 			PayloadLen: uint64(len(encryptedStripe)),
-			ShardNames: nil,
+			ShardNames: shardNames,
 		})
 	}
 
@@ -130,18 +125,32 @@ func backupFile(
 	}, nil
 }
 
-func Backup(
-	paths []string,
-	userID []byte,
-	datasetID []byte,
-	datasetKey []byte,
-	catalogKey []byte,
-	label string,
-	generation uint64,
-	parentManifestID []byte,
-	userX25519Pubkey []byte,
-	ed25519PrivateKey []byte,
-) error {
+func deriveUserIndexKey(userID []byte) []byte {
+	hash := sha256.New()
+	hash.Write([]byte("quailfs/userindex/v1"))
+	hash.Write(userID)
+	return hash.Sum(nil)
+}
+
+func deriveHeadKey(userID []byte, datasetID []byte) []byte {
+	hash := sha256.New()
+	hash.Write([]byte("quailfs/headkey/v1"))
+	hash.Write(userID)
+	hash.Write(datasetID)
+	return hash.Sum(nil)
+}
+
+func randomCatalogSuffix() (string, error) {
+	buf := make([]byte, 16)
+
+	if _, err := crand.Read(buf); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(buf), nil
+}
+
+func Backup(ctx context.Context, paths []string, userID []byte, datasetID []byte, datasetKey []byte, catalogKey []byte, label string, generation uint64, parentManifestID []byte, userX25519Pubkey []byte, ed25519PrivateKey []byte, libp2pPrivateKey crypto.PrivKey, peerInfos []peer.AddrInfo) error {
 	var stripeIDs [][]byte
 	var shardCollection [][][]byte
 
@@ -169,11 +178,7 @@ func Backup(
 					return nil
 				}
 
-				file, chunks, stripes, shards, err := backupFile(
-					path,
-					datasetID,
-					datasetKey,
-				)
+				file, chunks, stripes, shards, err := backupFile(path, datasetID, datasetKey)
 				if err != nil {
 					return err
 				}
@@ -190,11 +195,7 @@ func Backup(
 				return fmt.Errorf("backup directory %q: %w", rootPath, err)
 			}
 		} else {
-			file, chunks, stripes, shards, err := backupFile(
-				rootPath,
-				datasetID,
-				datasetKey,
-			)
+			file, chunks, stripes, shards, err := backupFile(rootPath, datasetID, datasetKey)
 			if err != nil {
 				return err
 			}
@@ -224,7 +225,7 @@ func Backup(
 		return fmt.Errorf("create manifest: %w", err)
 	}
 
-	_, err = catalog.CreateWrappedDataset(
+	wrappedDataset, err := catalog.CreateWrappedDataset(
 		userID,
 		datasetID,
 		datasetKey,
@@ -237,7 +238,7 @@ func Backup(
 		return fmt.Errorf("create wrapped dataset: %w", err)
 	}
 
-	_ = catalog.CreateHead(
+	head := catalog.CreateHead(
 		1,
 		userID,
 		datasetID,
@@ -253,7 +254,7 @@ func Backup(
 		Generation: generation,
 	}
 
-	_ = catalog.CreateUserIndex(
+	userIndex := catalog.CreateUserIndex(
 		1,
 		userID,
 		generation,
@@ -261,8 +262,135 @@ func Backup(
 		ed25519PrivateKey,
 	)
 
-	_ = stripeIDs
-	_ = shardCollection
+	h, err := network.NewHost(libp2pPrivateKey, false, nil)
+	if err != nil {
+		return fmt.Errorf("create libp2p host: %w", err)
+	}
+	defer h.Close()
+
+	livePeers := make([]peer.ID, 0, len(peerInfos))
+
+	for _, addrInfo := range peerInfos {
+		if err := h.Connect(ctx, addrInfo); err != nil {
+			return fmt.Errorf("connect to peer %s: %w", addrInfo.ID, err)
+		}
+
+		livePeers = append(livePeers, addrInfo.ID)
+	}
+
+	var objectNames []string
+
+	for _, stripes := range mStripes {
+		for _, shardName := range stripes.ShardNames {
+			objectNames = append(objectNames, string(shardName))
+		}
+	}
+
+	placements := place.Place(livePeers, objectNames)
+
+	for peerID, shardNames := range placements {
+		for _, shardName := range shardNames {
+			var shard []byte
+
+			for stripeIndex := range mStripes {
+				for shardIndex := range mStripes[stripeIndex].ShardNames {
+					if string(mStripes[stripeIndex].ShardNames[shardIndex]) != shardName {
+						continue
+					}
+
+					shard = shardCollection[stripeIndex][shardIndex]
+					break
+				}
+
+				if shard != nil {
+					break
+				}
+			}
+
+			if shard == nil {
+				return fmt.Errorf("shard %q not found", shardName)
+			}
+
+			if err := network.PutShard(ctx, h, peerID, shardName, shard); err != nil {
+				return fmt.Errorf("put shard %q to peer %s: %w", shardName, peerID, err)
+			}
+		}
+	}
+
+	userIndexKey := deriveUserIndexKey(userID)
+	headKey := deriveHeadKey(userID, datasetID)
+
+	userIndexSuffix, err := randomCatalogSuffix()
+	if err != nil {
+		return fmt.Errorf("generate user index suffix: %w", err)
+	}
+
+	headSuffix, err := randomCatalogSuffix()
+	if err != nil {
+		return fmt.Errorf("generate head suffix: %w", err)
+	}
+
+	manifestSuffix, err := randomCatalogSuffix()
+	if err != nil {
+		return fmt.Errorf("generate manifest suffix: %w", err)
+	}
+
+	userIndexName := fmt.Sprintf("userindex:%x:%s", userIndexKey, userIndexSuffix)
+	headName := fmt.Sprintf("head:%x:%s", headKey, headSuffix)
+	manifestName := fmt.Sprintf("manifest:%x:%s", manifest.ManifestID, manifestSuffix)
+
+	userIndexData := backup.SerializeUserIndex(userIndex)
+	headData := backup.SerializeHead(head)
+	wrappedDatasetData := backup.SerializeWrappedDataset(wrappedDataset)
+	headCatalogData := append(headData, wrappedDatasetData...)
+	manifestData := backup.SerializeManifestEnvelope(manifest)
+
+	catalogObjects := []catalogObject{
+		{
+			name:       userIndexName,
+			objectType: 1,
+			data:       userIndexData,
+		},
+		{
+			name:       headName,
+			objectType: 2,
+			data:       headCatalogData,
+		},
+		{
+			name:       manifestName,
+			objectType: 4,
+			data:       manifestData,
+		},
+	}
+
+	catalogNames := make([]string, 0, len(catalogObjects))
+
+	for _, object := range catalogObjects {
+		catalogNames = append(catalogNames, object.name)
+	}
+
+	catalogPlacements := place.Place(livePeers, catalogNames)
+
+	for peerID, objectNames := range catalogPlacements {
+		for _, objectName := range objectNames {
+			var object *catalogObject
+
+			for i := range catalogObjects {
+				if catalogObjects[i].name == objectName {
+					object = &catalogObjects[i]
+					break
+				}
+			}
+
+			if object == nil {
+				return fmt.Errorf("catalog object %q not found", objectName)
+			}
+
+			if err := network.PutCatalog(ctx, h, peerID, object.name, object.objectType, object.data); err != nil {
+				return fmt.Errorf("put catalog %q to peer %s: %w", object.name, peerID, err)
+			}
+		}
+	}
 
 	return nil
 }
